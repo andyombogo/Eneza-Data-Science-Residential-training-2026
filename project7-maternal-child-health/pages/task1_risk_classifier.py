@@ -227,20 +227,31 @@ with tab_performance:
     st.subheader("Why Random Forest? A cross-validated comparison, not an assumption")
     st.caption(
         "5-fold stratified cross-validation on the training split only "
-        "(test set never touched during model selection)."
+        "(test set never touched during model selection). Computed on demand "
+        "so this page doesn't pay for it on every load."
     )
-    comparison_df = get_model_comparison()
-    st.dataframe(comparison_df.style.format("{:.3f}").highlight_max(axis=0, color="#d4edda"),
-                 use_container_width=True)
-    st.bar_chart(comparison_df)
+    if st.button("Run live comparison (Logistic Regression / Random Forest / Gradient Boosting)"):
+        st.session_state["show_comparison"] = True
 
-    st.markdown(
-        "The linear baseline (Logistic Regression) is clearly outmatched, confirming "
-        "that risk boundaries in this data aren't linear — blood sugar in particular "
-        "behaves more like a threshold effect (see **Explore the Data**). Random "
-        "Forest is preferred over Gradient Boosting when the two are close, since it "
-        "overfits less readily on a dataset this size (~1,000 rows)."
-    )
+    if st.session_state.get("show_comparison"):
+        comparison_df = get_model_comparison()
+        st.dataframe(comparison_df.style.format("{:.3f}").highlight_max(axis=0, color="#d4edda"),
+                     use_container_width=True)
+        st.bar_chart(comparison_df)
+
+        st.markdown(
+            "The linear baseline (Logistic Regression) is clearly outmatched, confirming "
+            "that risk boundaries in this data aren't linear — blood sugar in particular "
+            "behaves more like a threshold effect (see **Explore the Data**). Random "
+            "Forest is preferred over Gradient Boosting when the two are close, since it "
+            "overfits less readily on a dataset this size (~1,000 rows)."
+        )
+    else:
+        st.markdown(
+            "*(Click the button above to run it — takes a few seconds. Headline result: "
+            "Random Forest and Gradient Boosting both clearly outperform the linear "
+            "baseline; full numbers and reasoning are in the README.)*"
+        )
 
     st.markdown(
         "**Hyperparameter tuning** (grid search over `n_estimators`, `max_depth`, "
