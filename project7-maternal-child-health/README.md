@@ -307,3 +307,18 @@ Hugging Face Spaces) because it deploys directly from a GitHub branch with
 zero infrastructure setup or cost, redeploys automatically on push, and is
 purpose-built for exactly this kind of small data-science demo — the fastest
 path to a shareable public link for a presentation.
+
+**Python version pin:** `.python-version` (`3.12`) is committed alongside
+`requirements.txt` so Streamlit Cloud's build tool (`uv`) doesn't provision
+whatever bleeding-edge Python it defaults to. Without this, a very new Python
+can have no prebuilt wheel for pinned packages like `scipy`, forcing a
+from-source build that fails in Cloud's sandbox (no Fortran compiler). If a
+deploy ever fails on a package build step, check the Python version in the
+log first before touching dependency versions.
+
+**Reading build logs without downloading the whole file:** a failed
+dependency build (like the scipy case above) can produce a log tens of
+thousands of lines long. In the Streamlit Cloud dashboard, use **Manage app →
+Logs** and read it in the browser panel rather than downloading it — the
+panel auto-scrolls to the failure and lets you search/copy just the relevant
+traceback instead of pulling the whole file.
