@@ -5,5 +5,4 @@ scikit-learn==1.7.0
 matplotlib==3.10.3
 seaborn==0.13.2
 joblib==1.5.1
-jupyterlab==4.5.1
 streamlit==1.47.0

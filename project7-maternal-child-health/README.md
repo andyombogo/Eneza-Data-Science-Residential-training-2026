@@ -68,8 +68,16 @@ see [Limitations & ethics](#9-limitations--ethical-considerations).
 ```
 project7-maternal-child-health/
 ├── PLAN.md                       # group task breakdown, owners, workflow
-├── requirements.txt               # pinned Python dependencies
-├── streamlit_app.py               # Task 1: interactive predictor + model report (live demo)
+├── requirements.txt               # pinned deps to RUN the app/scripts (kept light)
+├── requirements-dev.txt           # + jupyterlab, for local notebook work only
+├── .python-version                 # pins the app's Python version for cloud deploys
+├── streamlit_app.py               # app entry point — routes to one page per task
+├── pages/
+│   ├── overview.py                # landing page: project summary, task ownership/status
+│   ├── task1_risk_classifier.py  # Task 1: interactive predictor + model report
+│   ├── task2_regional_indicators.py  # Task 2 placeholder (not started)
+│   ├── task3_fairness_calibration.py # Task 3 placeholder (not started)
+│   └── task4_interventions.py        # Task 4 placeholder (not started)
 ├── .streamlit/config.toml         # app theme
 ├── scripts/
 │   └── download_data.py          # fetches raw dataset from UCI repo (not committed)
@@ -85,15 +93,22 @@ project7-maternal-child-health/
 
 ## 4. Setup
 
-Requires Python 3.10+. Dependencies are pinned in `requirements.txt` for
-reproducibility.
+Requires Python 3.10+. Dependencies are pinned for reproducibility, and split
+in two so the deployed app stays light:
 
 ```bash
 # from project7-maternal-child-health/
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+
+pip install -r requirements.txt      # to run the app or scripts
+pip install -r requirements-dev.txt  # + also want to edit the notebook (adds jupyterlab)
 ```
+
+`requirements.txt` is what Streamlit Cloud installs to deploy the app —
+`jupyterlab` alone pulls in dozens of transitive packages (`jupyter-server`,
+`notebook`, `tornado`, ...) that the app never uses at runtime, so it lives in
+`requirements-dev.txt` instead, kept in sync via `-r requirements.txt`.
 
 ## 5. Reproducing the results
 
@@ -104,7 +119,7 @@ python scripts/download_data.py
 # 2. Train and evaluate the classifier (writes models/risk_classifier.joblib)
 python src/task1_risk_classifier.py
 
-# 3. (optional) open the full EDA + model-selection notebook
+# 3. (optional, needs requirements-dev.txt) open the full EDA + model-selection notebook
 jupyter lab notebooks/task1_risk_classifier_eda.ipynb
 ```
 
@@ -263,26 +278,37 @@ group.
 
 ## 11. Live demo app
 
-`streamlit_app.py` is an interactive companion to this README — built for
-presenting Task 1, not just describing it. Four tabs:
+`streamlit_app.py` is an interactive companion to this README — a whole-project
+presentation shell, not just a Task 1 demo. It's a multipage app, one page per
+project task, so it's ready to grow as Tasks 2–4 land without a rebuild:
 
-- **🔮 Predict** — enter clinical measurements, get a risk prediction with
-  class probabilities; flags when an input falls outside the training data's
-  observed range.
-- **📊 Model Performance** — confusion matrix, classification report, feature
-  importances, and the live cross-validated Logistic Regression vs. Random
-  Forest vs. Gradient Boosting comparison from Section 7.
-- **🔍 Explore the Data** — class balance, per-feature distributions by risk
-  level, correlation heatmap.
-- **📖 Methodology & Ethics** — the stratification demonstration from Section 6
-  (recomputed live), limitations, and team/role attribution.
+- **🏠 Overview** — project summary and a task table (owner + status per task)
+  — the "who's doing what" a judge or teammate wants first.
+- **🔮 Task 1 — Risk Classifier** — the full working demo, in four tabs:
+  - **Predict** — enter clinical measurements, get a risk prediction with
+    class probabilities; flags when an input falls outside the training
+    data's observed range.
+  - **Model Performance** — confusion matrix, classification report, feature
+    importances, and the live cross-validated Logistic Regression vs. Random
+    Forest vs. Gradient Boosting comparison from Section 7.
+  - **Explore the Data** — class balance, per-feature distributions by risk
+    level, correlation heatmap.
+  - **Methodology & Ethics** — the stratification demonstration from
+    Section 6 (recomputed live) and limitations.
+- **📊 Task 2 / ⚖️ Task 3 / 🎯 Task 4** — placeholder pages showing each task's
+  description, owners, and status, so the app is already presentation-ready
+  for the whole group; each becomes a real page as that task is built.
+
+Only the Task 1 page imports the heavy stack (pandas/sklearn/matplotlib) — the
+other pages are plain text, so switching to them is instant even before
+they're built out.
 
 **No committed model or data file is required to run it.** On first load the
-app tries `data/raw/maternal_health_risk.csv`; if that's absent (e.g. a fresh
-clone or a cloud deploy) it fetches the dataset directly via `ucimlrepo`,
-trains the same tuned Random Forest as `src/task1_risk_classifier.py`
-(imported directly, not reimplemented), and caches both for the life of the
-app process.
+Task 1 page tries `data/raw/maternal_health_risk.csv`; if that's absent (e.g.
+a fresh clone or a cloud deploy) it fetches the dataset directly via
+`ucimlrepo`, trains the same tuned Random Forest as
+`src/task1_risk_classifier.py` (imported directly, not reimplemented), and
+caches both for the life of the app process.
 
 ### Run locally
 
