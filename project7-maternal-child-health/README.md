@@ -19,6 +19,7 @@ calibration audit, and intervention targeting) and for group ownership.
 | **Model** | Random Forest (tuned) — chosen over Logistic Regression and Gradient Boosting after cross-validated comparison, not by default |
 | **Result** | 86.2% test accuracy; **94.5% recall on `high risk`**, the class that matters most operationally |
 | **Reproduce** | `python scripts/download_data.py && python src/task1_risk_classifier.py`, or open `notebooks/task1_risk_classifier_eda.ipynb` |
+| **Live demo** | `streamlit run streamlit_app.py` (interactive predictor + full model report — see [Section 11](#11-live-demo-app)) |
 
 ## Contents
 
@@ -32,6 +33,7 @@ calibration audit, and intervention targeting) and for group ownership.
 8. [Results](#8-results)
 9. [Limitations & ethical considerations](#9-limitations--ethical-considerations)
 10. [Status](#10-status)
+11. [Live demo app](#11-live-demo-app)
 
 ## 1. Problem statement
 
@@ -67,6 +69,8 @@ see [Limitations & ethics](#9-limitations--ethical-considerations).
 project7-maternal-child-health/
 ├── PLAN.md                       # group task breakdown, owners, workflow
 ├── requirements.txt               # pinned Python dependencies
+├── streamlit_app.py               # Task 1: interactive predictor + model report (live demo)
+├── .streamlit/config.toml         # app theme
 ├── scripts/
 │   └── download_data.py          # fetches raw dataset from UCI repo (not committed)
 ├── src/
@@ -256,3 +260,50 @@ per-prediction explanations (SHAP).
 See `PLAN.md` for the status of Tasks 2–4 (regional/wealth EDA, fairness &
 calibration audit, intervention targeting) and for task ownership within the
 group.
+
+## 11. Live demo app
+
+`streamlit_app.py` is an interactive companion to this README — built for
+presenting Task 1, not just describing it. Four tabs:
+
+- **🔮 Predict** — enter clinical measurements, get a risk prediction with
+  class probabilities; flags when an input falls outside the training data's
+  observed range.
+- **📊 Model Performance** — confusion matrix, classification report, feature
+  importances, and the live cross-validated Logistic Regression vs. Random
+  Forest vs. Gradient Boosting comparison from Section 7.
+- **🔍 Explore the Data** — class balance, per-feature distributions by risk
+  level, correlation heatmap.
+- **📖 Methodology & Ethics** — the stratification demonstration from Section 6
+  (recomputed live), limitations, and team/role attribution.
+
+**No committed model or data file is required to run it.** On first load the
+app tries `data/raw/maternal_health_risk.csv`; if that's absent (e.g. a fresh
+clone or a cloud deploy) it fetches the dataset directly via `ucimlrepo`,
+trains the same tuned Random Forest as `src/task1_risk_classifier.py`
+(imported directly, not reimplemented), and caches both for the life of the
+app process.
+
+### Run locally
+
+```bash
+# from project7-maternal-child-health/, with requirements.txt installed
+streamlit run streamlit_app.py
+```
+
+### Deploy (Streamlit Community Cloud — free, GitHub-integrated)
+
+1. Push this branch to GitHub (already done for `project7-setup`).
+2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with
+   GitHub.
+3. **New app** → repository `andyombogo/Eneza-Data-Science-Residential-training-2026`,
+   branch `project7-setup`, **main file path**
+   `project7-maternal-child-health/streamlit_app.py`.
+4. Deploy. `requirements.txt` sits in the same folder as the entry point, so
+   Streamlit Cloud picks it up automatically — no extra config needed.
+
+Streamlit Community Cloud was chosen over alternatives (Render, Railway,
+Hugging Face Spaces) because it deploys directly from a GitHub branch with
+zero infrastructure setup or cost, redeploys automatically on push, and is
+purpose-built for exactly this kind of small data-science demo — the fastest
+path to a shareable public link for a presentation.
