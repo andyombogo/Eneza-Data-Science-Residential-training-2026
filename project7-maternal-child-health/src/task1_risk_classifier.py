@@ -23,15 +23,28 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def train(df: pd.DataFrame) -> tuple[RandomForestClassifier, dict]:
+def split_data(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42):
+    """Stratified train/test split shared by training and model-comparison code.
+
+    Stratifying on RiskLevel keeps the ~40/33/27 class split intact in both
+    halves; with only ~270 high-risk rows a plain random split can otherwise
+    starve the test set of the minority class and make its recall estimate
+    noisy (see notebooks/task1_risk_classifier_eda.ipynb, Section 6).
+    """
     X = df[FEATURES]
     y = df[TARGET]
+    return train_test_split(X, y, test_size=test_size, stratify=y, random_state=random_state)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=42
+
+def train(df: pd.DataFrame) -> tuple[RandomForestClassifier, dict]:
+    X_train, X_test, y_train, y_test = split_data(df)
+
+    # Hyperparameters chosen by grid search over n_estimators/max_depth/min_samples_leaf
+    # in notebooks/task1_risk_classifier_eda.ipynb (Section 8), which beat the
+    # untuned default (300 trees, unlimited depth) on 5-fold CV macro F1.
+    model = RandomForestClassifier(
+        n_estimators=200, max_depth=20, min_samples_leaf=1, random_state=42
     )
-
-    model = RandomForestClassifier(n_estimators=300, random_state=42)
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)

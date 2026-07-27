@@ -7,7 +7,7 @@ Final presentation: **August 7, 2026**.
 
 | # | Task | Owner | Status |
 |---|------|-------|--------|
-| 1 | Predict maternal risk level from clinical measurements (UCI Maternal Health Risk) | John Andrew & Jared Onsumu | In progress |
+| 1 | Predict maternal risk level from clinical measurements (UCI Maternal Health Risk) | John Andrew & Jared Onsomu | Done |
 | 2 | Describe how Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region & wealth quintile (DHS/UNICEF) | Kevinson Mwangi & Elphas Abok | Not started |
 | 3 | Audit the risk model for fairness across age groups & check calibration | TBD | Not started |
 | 4 | Discuss where to target interventions | TBD | Not started |
