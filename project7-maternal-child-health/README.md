@@ -9,6 +9,9 @@ This README documents Task 1 in detail; see `PLAN.md` for how it fits into the
 project's other three tasks (regional/wealth disaggregation, fairness & calibration
 audit, and intervention targeting).
 
+**Task 1 owners:** John Andrew, Jared Onsumu (see `PLAN.md` for the full group
+task breakdown and ownership).
+
 ## 1. Problem statement
 
 Maternal mortality is often preventable when at-risk pregnancies are flagged early.
@@ -47,6 +50,8 @@ project7-maternal-child-health/
 │   └── download_data.py          # fetches raw dataset from UCI repo (not committed)
 ├── src/
 │   └── task1_risk_classifier.py  # Task 1: train + evaluate the risk classifier
+├── notebooks/
+│   └── task1_risk_classifier_eda.ipynb  # Task 1: EDA, training walk-through, evaluation plots
 ├── data/
 │   └── raw/                      # gitignored — populated by download_data.py
 └── models/
@@ -55,7 +60,8 @@ project7-maternal-child-health/
 
 ## 4. Setup
 
-Requires Python 3.10+.
+Requires Python 3.10+. Dependencies are pinned in `requirements.txt` for
+reproducibility.
 
 ```bash
 # from project7-maternal-child-health/
@@ -72,6 +78,9 @@ python scripts/download_data.py
 
 # 2. Train and evaluate the classifier (writes models/risk_classifier.joblib)
 python src/task1_risk_classifier.py
+
+# 3. (optional) open the EDA + walkthrough notebook
+jupyter lab notebooks/task1_risk_classifier_eda.ipynb
 ```
 
 Running `task1_risk_classifier.py` will:
@@ -86,6 +95,15 @@ Running `task1_risk_classifier.py` will:
 5. Save the fitted model to `models/risk_classifier.joblib` for reuse (e.g. by
    the Task 3 fairness/calibration audit).
 
+`notebooks/task1_risk_classifier_eda.ipynb` imports `load_data`/`train` directly
+from `src/task1_risk_classifier.py` (single source of truth for the modelling
+logic) and adds the narrative layer on top: data-quality checks, class-balance
+and per-feature distribution plots, a correlation heatmap, the confusion matrix
+and classification report rendered as a table/plot, and a feature-importance
+chart. It is committed with outputs already populated (re-run it if you want
+fresh numbers after a code change) — run `download_data.py` first so the
+notebook can find the raw CSV.
+
 ## 6. Modelling approach
 
 - **Algorithm:** Random Forest was chosen as a strong, low-effort baseline for
@@ -98,6 +116,14 @@ Running `task1_risk_classifier.py` will:
 - **Reproducibility:** a fixed `random_state=42` is used for both the split and
   the model so results are deterministic across runs.
 
+**Current test-set performance** (from `notebooks/task1_risk_classifier_eda.ipynb`):
+overall accuracy 0.86; per-class recall — `high risk` 0.95, `low risk` 0.80,
+`mid risk` 0.85. `high risk` recall is the number that matters most operationally
+(see [Limitations & ethics](#7-limitations--ethical-considerations)), and it is
+the strongest of the three. Feature importances confirm `BS` (blood sugar) and
+the two blood-pressure readings dominate, consistent with the EDA — see the
+notebook for the full breakdown and plots.
+
 ### Suggested extensions (not yet implemented)
 
 - Compare against a simpler baseline (logistic regression) and a gradient-boosted
@@ -105,8 +131,6 @@ Running `task1_risk_classifier.py` will:
   its keep.
 - Hyperparameter tuning via cross-validation (current settings are reasonable
   defaults, not tuned).
-- Feature importance / SHAP analysis to check the model is leaning on clinically
-  plausible signals (e.g. blood sugar and BP should dominate over heart rate).
 
 ## 7. Limitations & ethical considerations
 
@@ -131,8 +155,13 @@ Running `task1_risk_classifier.py` will:
 
 ## 8. Status
 
-Implemented: data download script, Random Forest baseline, train/test evaluation
-with confusion matrix + classification report, saved model artifact.
+Implemented: data download script, EDA (class balance, feature distributions,
+correlation), Random Forest baseline, train/test evaluation with confusion
+matrix + classification report, feature importances, saved model artifact,
+reproducible notebook, pinned dependencies.
+
+Remaining for Task 1: baseline comparison (logistic regression) and
+hyperparameter tuning — both optional refinements, not blockers.
 
 See `PLAN.md` for the status of Tasks 2–4 (regional/wealth EDA, fairness &
 calibration audit, intervention targeting) and for task ownership within the
