@@ -1,0 +1,647 @@
+---
+title: "Task 2: How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile."
+author: "Kevinson Mwangi & Elphas Abok"
+date: today
+format: html
+---
+
+## Loading the KDHS Data 2022 (KR Record)
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+rm(list = ls())
+
+# Packages
+pacman::p_load(
+  tidyverse, haven, labelled, epiDisplay, survey,
+  gtsummary, extrafont, flextable, rKenyaCensus, sf, rineq)
+
+# Plotting functions
+## Pointrange graphs
+plot_pointrange <- 
+    function(data, x_var, estimate, lower, upper, 
+    reference_line = NULL, y_limits = c(5, 50),
+    y_breaks = seq(5, 50, 5),
+    y_label = "Weighted prevalence (%)") {
+
+  x_var <- rlang::ensym(x_var)
+  estimate <- rlang::ensym(estimate)
+  lower <- rlang::ensym(lower)
+  upper <- rlang::ensym(upper)
+
+  p <- data |>
+    ggplot(
+      aes(
+        x = forcats::fct_reorder(!!x_var, !!estimate, .desc = TRUE),
+        y = !!estimate)) +
+    geom_pointrange(
+      aes(
+        ymin = !!lower,
+        ymax = !!upper),
+      size = .3,
+      color = "gray30") +
+    scale_y_continuous(
+      limits = y_limits,
+      breaks = y_breaks) +
+    labs(
+      x = NULL,
+      y = y_label) +
+    theme_bw(
+      base_family = "Candara",
+      base_size = 14) +
+    theme(
+      axis.text = element_text(color = "black"),
+      axis.text.x = element_text(angle = 90, vjust = .5))
+
+  if (!is.null(reference_line)) {
+    p <- p +
+      geom_hline(
+        yintercept = reference_line,
+        lty = 2,
+        color = "blue")
+  }
+
+  return(p)
+}
+
+## Maps
+plot_map <- function(
+    data, fill, breaks, labels, legend_title, subtitle, palette = "YlGnBu", direction = 1) {
+
+  fill <- rlang::ensym(fill)
+
+  data |>
+    mutate(
+      fill_cat = cut(
+        !!fill,
+        breaks = breaks,
+        labels = labels,
+        right = FALSE,
+        include.lowest = TRUE)) |>
+    ggplot() +
+    geom_sf(
+      aes(fill = fill_cat),
+      color = "gray30") +
+    scale_fill_brewer(
+      palette = palette,
+      direction = direction) +
+    labs(
+      fill = legend_title,
+      subtitle = subtitle) +
+    theme_minimal(base_family = "Candara", base_size = 14) +
+    theme(
+      axis.text = element_blank(),
+      plot.subtitle = element_text(hjust = .6, vjust = -8),
+      legend.background = element_rect(color = "gray70"),
+      legend.position = c(0.2, 0.18),
+      panel.grid = element_blank()
+    )
+}
+
+# Data
+df <- read_dta("../Mini project/Data/KEKR8BDT/KEKR8BFL.DTA")
+
+```
+
+## Data preparation
+```{r}
+#| label: data-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+## Restrict the analysis to the youngest alive child, living with the responded 
+df <- df |>  
+    mutate(
+        age_months = v008 - b3) |> 
+    filter(
+        b5 == 1, # child is alive
+        b9 == 0, # child lives with the respondent
+        !is.na(v003) # mother's line number must be available
+        ) |>
+    group_by(
+        v001, 
+        v002, 
+        v003 # grouping by cluster, household, and mothers line number
+    ) |> 
+    mutate(
+        bidxr = 
+            rank(bidx, ties.method = "first")) |> 
+    filter(
+        bidxr == 1 # Keeping the youngest child 
+        ) |> 
+    ungroup()
+
+df <- df |> 
+    mutate(
+        wt = v005/1000000, # sample weight
+        wealth_cont = v191/100000,
+        wealth_q = v190
+    )
+```
+
+The datasets includes a total of `r dim(df)[[1]]` children from `r length(unique(df$v001))` clusters across Kenya. 
+
+## The ouctomes of interest
+### Stunting
+#### National weighted n and prevalence of stunting
+
+```{r}
+#| label: fig-stunting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Histogram of HAZ scores"
+
+df_stunting <- df |> 
+    filter(
+        age_months > 5 & age_months < 60) |> 
+  mutate(
+    hw70 = ifelse( #hw70 is the height-for-age zscore and should be divided by 100
+        hw70 >
+         1000, NA, hw70),
+    haz = hw70/100,
+    
+    stunted = ifelse(haz < -2, "Stunted", "Not stunted"),
+    stun = ifelse(stunted == "Stunted", 1, 0))
+ 
+df_stunting |> 
+    ggplot(
+        aes(x = haz)) +
+            geom_histogram(color = "white") +
+            labs(
+                x = "Height-for-age z-score (HAZ scores)",
+                y = "Frequency") + 
+    theme_bw(base_family = "Candara", base_size = 14) +
+    theme(panel.grid = element_blank())
+```
+
+
+```{r}
+#| label: survey-setting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Survey setting
+stunting_survey <- svydesign(
+  id = ~v021, # primary sampling unit       
+  strata = ~v022, # strata     
+  weights = ~wt,       
+  data = df_stunting,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+
+# Weighted prevalence of stunting
+tbl <- tbl_svysummary(
+  stunting_survey,
+  include = stunted,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany",
+  missing_text = "Missing",
+  label = stunted ~ "Stunting status")
+```
+
+Stunting was defined as height-for-age z-score (HAZ) < -2 based on the WHO 2006 growth reference standards. The analysis included a total of `r dim(df_stunting)[[1]]`. According to the WHO guidelines, HAZ scores range from -6 to 6 and this was ascertained for the data as shown in @fig-stunting. The data was then survey-set to account for the two-stage sampling design of DHS. The weighted n (prevalence %) of stunting among the 6-59 months old children was `r tbl$table_body[3, 6][[1]]`.
+
+
+#### Does stunting vary by region (subnationa level/county)?
+
+```{r}
+#| label: fig-prev-counties
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels. The blue line represents the national weighted prevalence"
+
+county_stunting <- svyby(
+  ~ I(stunted == "Stunted"),
+  by = ~v024,
+  design = stunting_survey,
+  FUN = svyciprop,
+  vartype = "ci",
+  na.rm = TRUE)
+
+stunting_county <- county_stunting |> 
+    mutate(
+        county = v024,
+        prevalence = `I(stunted == "Stunted")`,
+        lb = ci_l,
+        ub = ci_u) |> 
+    select(county, prevalence, lb, ub)
+
+
+stunting_county <- stunting_county |> 
+    mutate(
+        name = names(attr(county, "labels")) |> 
+            str_to_title() |> 
+            str_replace_all("[[:punct:]]", " "))
+
+
+# Fetching Kenya counties shapefiles
+kenya_shp <- rKenyaCensus::KenyaCounties_SHP |> 
+    janitor::clean_names() |> 
+    st_as_sf() |> 
+    select(county) |> 
+    mutate(
+        county = str_to_title(county) |> 
+            str_replace_all("[[:punct:]]", " "))
+
+kenya_shp[kenya_shp$county == "Nairobi City", "county"] <- "Nairobi"
+
+# Merge the prevalence data to the shp file data
+merged_stunting <- kenya_shp |> 
+    left_join(
+        stunting_county, by = c("county" = "name")) |> 
+    mutate(
+        across(
+            c(prevalence, lb, ub), ~round(., 3)*100))
+
+# Plotting the prevalence across the counties
+plot_pointrange(
+    merged_stunting, x_var = "county", estimate = "prevalence",
+    lower = lb, upper = ub,
+    reference_line = 
+        as.numeric(
+            str_extract(tbl$table_body[3, 6][[1]],
+             "(?<=\\()[0-9.]+(?=\\))")),
+    y_limits = c(5, 50),
+    y_breaks = seq(5, 50, 5),
+    y_label = "Weighted prevalence (%)")
+```
+
+
+@fig-prev-counties shows the weighted prevalence of stunting among children 6-59 months at the subnational levels with the blue dotted line showing the weighted national prevalence.
+
+```{r}
+#| label: fig-prev-map
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels"
+        
+## Prevalence maps
+plot_map(
+    merged_stunting, fill = prevalence,
+    breaks = c(0, 10, 20, 30, 40, 50),
+    labels = c("0–10", "11–20", "21–30", "31–40", "41–50"),
+    legend_title = "Prevalence (%)", subtitle = NULL,
+    palette = 6, direction = 1)
+    
+```
+
+
+@fig-prev-map shows the weighted prevalence of stunting among children 6-59 months at the subnational levels. Darker shades shows increasing prevalence
+
+#### Does stunting vary by wealth status?
+##### Weighted concentration curves
+```{r}
+#| label: concentration-curves-data-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+cc_df <- df_stunting |> 
+    filter(!is.na(stun), !is.na(wealth_cont), !is.na(wt)) |>     
+    arrange(wealth_cont) |> 
+    mutate(
+        cum_prop = cumsum(wt) / sum(wt),
+        cum_stunted = cumsum(stun*wt) / sum(stun*wt))
+    
+
+cc_df <- df_stunting |>  
+    filter(!is.na(stun), !is.na(wealth_cont), !is.na(wt)) |>     
+    arrange(wealth_cont) |> 
+    mutate(
+    pop_rank = cumsum(wt) - wt / 2, # midpoint rank within own weight mass
+    pop_rank = pop_rank / sum(wt)) |> 
+  group_by(wealth_cont) |>   # collapse exact ties
+  mutate(pop_rank = mean(pop_rank)) |> # give tied group its average rank
+  ungroup() |> 
+  arrange(pop_rank) |> 
+  mutate(
+        cum_prop = cumsum(wt) / sum(wt),
+        cum_stunted = cumsum(stun*wt) / sum(stun*wt))
+
+cc_plot_data <- bind_rows(
+  data.frame(cum_prop = 0, cum_stunted = 0),
+  cc_df |> select(cum_prop, cum_stunted)) # Adding (0, 0) for plotting
+
+```
+
+```{r}
+
+#| label: fig-concentration-curves-plotting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels"
+
+## Concentration index
+ci_result <- ci(
+  ineqvar = df_stunting$wealth_cont,
+  outcome = df_stunting$stun,
+  weights = df_stunting$wt,
+  type    = "CIw")
+
+cc_plot_data |> 
+  ggplot(aes(x = cum_prop, y = cum_stunted)) +
+  geom_line(color = "navyblue", linewidth = 1) +
+  geom_abline(
+    slope = 1, intercept = 0,
+     color = "#813134") +
+  annotate(
+    "text",
+    x = 0.05, y = 0.95,
+    label = paste0(
+      "CI (95% CI) = ",
+      round(ci_result$concentration_index, 2),
+      " (",
+      round(confint(ci_result)[[1]], 2), ",",
+      round(confint(ci_result)[[2]], 2), ")"),
+    family = "Candara",
+    hjust = 0, vjust = 1,
+    size = 4.0) +
+  labs(
+    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    y = "Cumulative % of stunted children") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(
+    panel.grid = element_blank())
+
+```
+
+
+## Immunisation, restricted to children 12-23 months
+Immunisation analysis was restricted to only 12-23 months. Full vaccination was defined as having taken BCG, HepB (birth dose), 3 doses of DPT-HepB-Hib, 3 [4] doses of OPV, 1 dose of IPV, 3 [2] doses of pneumococcal vaccine, 3 [2] doses of rotavirus vaccine, and 1 dose of MCV, according to the national vaccination schedule.
+
+#### National weighted n and prevalence of stunting
+```{r}
+
+#| label: immunisation-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Defining fully vaccinated children 12-23 years
+
+df_immunn_12_23 <- df |> 
+    filter(
+        age_months >= 12 & age_months < 24) |> 
+    mutate(
+        fully_vaccinated = 
+            ifelse(
+
+            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
+
+            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
+            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
+            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
+            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
+            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
+
+            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
+            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
+            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
+
+            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
+            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
+            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
+
+            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
+            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
+
+            h9 %in% c(1, 2, 3)  # Measles rubella 1
+            ), "Fully vaccinated", "Not fully vaccinated")
+    )
+
+
+# Survey setting
+immunn_survey_12_23 <- svydesign(
+  id = ~v021, # primary sampling unit       
+  strata = ~v022, # strata     
+  weights = ~wt,       
+  data = df_immunn_12_23,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+
+# Weighted prevalence of stunting
+tbl_immun_12_23 <- tbl_svysummary(
+  immunn_survey_12_23,
+  include = fully_vaccinated,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany",
+  missing_text = "Missing",
+  label = fully_vaccinated ~ "Vaccination status")
+
+# Defining fully vaccinated children 24-35 years
+df_immunn_24_35 <- df |> 
+    filter(
+        age_months >= 24 & age_months < 36) |> 
+    mutate(
+        fully_vaccinated = 
+            ifelse(
+
+            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
+
+            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
+            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
+            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
+            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
+            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
+
+            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
+            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
+            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
+
+            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
+            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
+            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
+
+            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
+            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
+
+            h9 %in% c(1, 2, 3) &  # Measles rubella 1
+            h9a %in% c(1, 2, 3)   # Measles rubella 2
+            ), "Fully vaccinated", "Not fully vaccinated")
+    )
+
+
+# Survey setting
+immunn_survey_24_35 <- svydesign(
+  id = ~v021, # primary sampling unit       
+  strata = ~v022, # strata     
+  weights = ~wt,       
+  data = df_immunn_24_35,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+
+# Weighted prevalence 
+tbl_immun_24_35 <- tbl_svysummary(
+  immunn_survey_24_35,
+  include = fully_vaccinated,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany",
+  missing_text = "Missing",
+  label = fully_vaccinated ~ "Vaccination status")
+
+```
+
+
+
+```{r}
+#| label: fig-prev-counties-immunisation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of full vacciantion among children 12-23 and 24-35 months at the subnationa levels. The blue line represents the national weighted prevalence"
+
+# 12-23 months
+county_immunn_12_23 <- svyby(
+  ~ I(fully_vaccinated == "Fully vaccinated"),
+  by = ~v024,
+  design = immunn_survey_12_23,
+  FUN = svyciprop,
+  vartype = "ci",
+  na.rm = TRUE)
+
+immunn_12_23_county <- county_immunn_12_23 |> 
+    mutate(
+        county = v024,
+        prevalence = `I(fully_vaccinated == "Fully vaccinated")`,
+        lb = ci_l,
+        ub = ci_u,
+        group = rep("12-23 months")) |> 
+    select(county, group, prevalence, lb, ub)
+
+
+immunn_12_23_county <- immunn_12_23_county |> 
+    mutate(
+        name = names(attr(county, "labels")) |> 
+            str_to_title() |> 
+            str_replace_all("[[:punct:]]", " "))
+
+
+# Merge the prevalence data to the shp file data
+merged_immunn_12_23 <- kenya_shp |> 
+    left_join(
+        immunn_12_23_county, by = c("county" = "name")) |> 
+    mutate(
+        across(
+            c(prevalence, lb, ub), ~round(., 3)*100))
+
+# Plotting
+plot_pointrange(
+    merged_immunn_12_23, x_var = "county", estimate = "prevalence",
+    lower = lb, upper = ub,
+    reference_line = 
+        as.numeric(
+            str_extract(tbl_immun_12_23$table_body[3, 6][[1]],
+             "(?<=\\()[0-9.]+(?=\\))")),
+    y_limits = c(0, 100),
+    y_breaks = seq(0, 100, 10),
+    y_label = "Weighted prevalence (%)")
+
+# 24-35 months
+county_immunn_24_35 <- svyby(
+  ~ I(fully_vaccinated == "Fully vaccinated"),
+  by = ~v024,
+  design = immunn_survey_24_35,
+  FUN = svyciprop,
+  vartype = "ci",
+  na.rm = TRUE)
+
+immunn_24_35_county <- county_immunn_24_35 |> 
+    mutate(
+        county = v024,
+        prevalence = `I(fully_vaccinated == "Fully vaccinated")`,
+        lb = ci_l,
+        ub = ci_u,
+        group = rep("24-35 months")) |> 
+    select(county, group, prevalence, lb, ub)
+
+
+immunn_24_35_county <- immunn_24_35_county |> 
+    mutate(
+        name = names(attr(county, "labels")) |> 
+            str_to_title() |> 
+            str_replace_all("[[:punct:]]", " "))
+
+
+# Merge the prevalence data to the shp file data
+merged_immunn_24_35 <- kenya_shp |> 
+    left_join(
+        immunn_24_35_county, by = c("county" = "name")) |> 
+    mutate(
+        across(
+            c(prevalence, lb, ub), ~round(., 3)*100))
+
+
+# Plotting the prevalence across the counties
+plot_pointrange(
+    merged_immunn_24_35, x_var = "county", estimate = "prevalence",
+    lower = lb, upper = ub,
+    reference_line = 
+        as.numeric(
+            str_extract(tbl_immun_24_35$table_body[3, 6][[1]],
+             "(?<=\\()[0-9.]+(?=\\))")),
+    y_limits = c(0, 100),
+    y_breaks = seq(0, 100, 10),
+    y_label = "Weighted prevalence (%)")
+
+```
+
+
+```{r}
+#| label: fig-prev-maps-immunn
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Prevalence of full vacciantion among children 12-23 and 24-35 months at the subnationa level"
+
+figa <- plot_map(
+  merged_immunn_12_23,
+  fill = prevalence,
+  breaks = c(0, 20, 40, 60, 80, 100),
+  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
+  legend_title = "Prevalence (%)",
+  subtitle = "12–23 months",
+  palette = 8,
+  direction = -1
+)
+
+figb <- plot_map(
+  merged_immunn_24_35,
+  fill = prevalence,
+  breaks = c(0, 20, 40, 60, 80, 100),
+  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
+  legend_title = "Prevalence (%)",
+  subtitle = "24–35 months",
+  palette = 8,
+  direction = -1
+)
+
+figa | figb
+
+```
+
