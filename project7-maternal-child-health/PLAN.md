@@ -21,6 +21,39 @@ Every member should be able to explain the whole project, not just their own tas
 - Do not commit raw data — scripts fetch it on demand (`scripts/download_data.py`).
 - Pin dependencies in `requirements.txt`.
 
+### Branch flow
+
+```
+upstream/main   (ENEZA-DSI/Eneza-Data-Science-Residential-training-2026 — the org repo)
+      ↓  fork
+your main       (andyombogo/Eneza-Data-Science-Residential-training-2026, branch: main)
+      ↓  branch
+project7-setup  (this project's integration branch — everyone's task branches merge here)
+      ↓  branch
+task branches   (e.g. task2-regional-indicators, one per task)
+      ↓  PR
+project7-setup  (merge task work back in)
+      ↓  PR (once the whole project is ready)
+upstream/main
+```
+
+Confirmed state: `origin` = `andyombogo/Eneza-Data-Science-Residential-training-2026`
+(fork), `upstream` = `ENEZA-DSI/Eneza-Data-Science-Residential-training-2026`
+(org repo); `main` is in sync with `upstream/main` (no drift). `project7-setup`
+is the integration branch — the Streamlit app is deployed from it, so **don't
+rename it** without updating the Streamlit Cloud app's branch setting too. Note
+this repo's own naming is `project7-setup`, not `project-7` — same role, just
+that name; rename only if the team wants to, since it'd need a matching update
+on the live deploy.
+
+`task2-regional-indicators` already follows this correctly (branched off
+`project7-setup`). Task 1's work was committed directly to `project7-setup`
+rather than through its own task branch + PR — a gap versus the intended
+workflow above, left as-is since it's already merged, but worth following the
+branch-per-task pattern for Tasks 2–4 going forward. Collaborators need push
+access to `origin` to work this way (see repo Settings → Collaborators) —
+otherwise they fork `origin` themselves and PR into `project7-setup`.
+
 ## Deliverables checklist
 
 - [x] Reproducible notebook (Task 1: `notebooks/task1_risk_classifier_eda.ipynb`)

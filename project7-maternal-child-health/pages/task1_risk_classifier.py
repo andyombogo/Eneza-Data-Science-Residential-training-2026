@@ -13,11 +13,14 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -57,17 +60,18 @@ def get_trained():
     return train(get_data())
 
 
-@st.cache_resource(show_spinner="Cross-validating candidate models (Logistic Regression / Random Forest / Gradient Boosting)...")
+@st.cache_resource(show_spinner="Cross-validating 6 candidate models (Decision Tree / KNN / Naive Bayes / SVM / Gradient Boosting / Random Forest)...")
 def get_model_comparison() -> pd.DataFrame:
     df = get_data()
     X_train, _, y_train, _ = split_data(df)
 
     candidates = {
-        "Logistic Regression": make_pipeline(
-            StandardScaler(), LogisticRegression(max_iter=1000, random_state=RNG)
-        ),
-        "Random Forest": RandomForestClassifier(n_estimators=300, random_state=RNG),
+        "Decision Tree": DecisionTreeClassifier(random_state=RNG),
+        "K-Nearest Neighbors": make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=7)),
+        "Naive Bayes": GaussianNB(),
+        "SVM (RBF)": make_pipeline(StandardScaler(), SVC(random_state=RNG)),
         "Gradient Boosting": GradientBoostingClassifier(random_state=RNG),
+        "Random Forest": RandomForestClassifier(n_estimators=300, random_state=RNG),
     }
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RNG)
 
@@ -230,7 +234,7 @@ with tab_performance:
         "(test set never touched during model selection). Computed on demand "
         "so this page doesn't pay for it on every load."
     )
-    if st.button("Run live comparison (Logistic Regression / Random Forest / Gradient Boosting)"):
+    if st.button("Run live comparison (6 models, varied assumptions)"):
         st.session_state["show_comparison"] = True
 
     if st.session_state.get("show_comparison"):
@@ -240,17 +244,27 @@ with tab_performance:
         st.bar_chart(comparison_df)
 
         st.markdown(
-            "The linear baseline (Logistic Regression) is clearly outmatched, confirming "
-            "that risk boundaries in this data aren't linear — blood sugar in particular "
-            "behaves more like a threshold effect (see **Explore the Data**). Random "
-            "Forest is preferred over Gradient Boosting when the two are close, since it "
-            "overfits less readily on a dataset this size (~1,000 rows)."
+            "**Several converging reasons, not one:** Decision Tree comes closest to "
+            "Random Forest — a single tree already captures most of the structure, "
+            "confirming the risk boundary is threshold-like (see **Explore the Data**), "
+            "and Random Forest's edge over it is the variance reduction ensembling is "
+            "supposed to buy. Gradient Boosting trails, plausible for sequential "
+            "boosting overfitting a dataset this small. SVM and KNN — both "
+            "distance/margin-based — underperform substantially, since a threshold "
+            "rule like \"BS above X\" is a natural axis-aligned cut for a tree but an "
+            "awkward shape for Euclidean-distance or kernel-margin geometry. Naive "
+            "Bayes is weakest by far: its independence assumption is directly violated "
+            "by the BP correlation seen below. (Logistic Regression is intentionally "
+            "excluded from this round — it's a fully valid multiclass classifier in "
+            "scikit-learn, the slot was spent on a wider spread of model families "
+            "instead; see the notebook for the full writeup.)"
         )
     else:
         st.markdown(
             "*(Click the button above to run it — takes a few seconds. Headline result: "
-            "Random Forest and Gradient Boosting both clearly outperform the linear "
-            "baseline; full numbers and reasoning are in the README.)*"
+            "Random Forest wins on cross-validated macro F1 against five alternatives "
+            "spanning very different assumptions; full numbers and reasoning are in "
+            "the README and notebook.)*"
         )
 
     st.markdown(
@@ -285,15 +299,26 @@ with tab_explore:
     st.pyplot(fig)
 
     st.subheader("Feature distributions by risk level")
+    st.caption(
+        "Histograms, not boxplots — a boxplot's five-number summary hides *shape* "
+        "(skew, multimodality, threshold steps), and that shape is exactly what "
+        "explains the model comparison below: `BS` shows a step-like jump for "
+        "`high risk` rather than a smoothly shifted curve, which is why "
+        "threshold-splitting tree models beat distance/margin-based ones. "
+        "Density-normalised since the three classes have different sample sizes."
+    )
     sns.set_theme(style="whitegrid")
     fig, axes = plt.subplots(2, 3, figsize=(14, 8))
     for ax, feature in zip(axes.ravel(), FEATURES):
-        sns.boxplot(
-            data=df, x=TARGET, y=feature, order=RISK_ORDER, ax=ax, hue=TARGET,
-            palette=RISK_COLOR, legend=False,
-        )
+        for risk in RISK_ORDER:
+            sns.histplot(
+                df.loc[df[TARGET] == risk, feature], ax=ax, color=RISK_COLOR[risk],
+                label=risk, stat="density", element="step", fill=True, alpha=0.35,
+                common_norm=False,
+            )
         ax.set_title(feature)
         ax.set_xlabel("")
+    axes.ravel()[0].legend(fontsize=8)
     plt.tight_layout()
     st.pyplot(fig)
 
@@ -326,6 +351,20 @@ with tab_about:
         "Stratification pins it to the true ratio, which is what makes the "
         "`high risk` recall reported in **Model Performance** trustworthy rather "
         "than a roll of the dice."
+    )
+
+    st.divider()
+    st.subheader("Is the class imbalance a problem? A SMOTE check")
+    st.markdown(
+        "`RiskLevel` is imbalanced ~1.5:1 (largest class : smallest). That's mild — "
+        "SMOTE (synthetic minority oversampling) is usually reached for around 4:1 "
+        "or worse. Rather than assume mild imbalance means \"do nothing,\" the "
+        "notebook tested it: a Random Forest cross-validated with SMOTE applied "
+        "only inside the training folds scored **0.821 macro F1** vs. **0.819** "
+        "without it — a difference within noise. **Decision: no resampling in the "
+        "production pipeline** — it would add a dependency and a leakage risk for "
+        "no measurable benefit. Full methodology in "
+        "`notebooks/task1_risk_classifier_eda.ipynb`, Section 4."
     )
 
     st.divider()

@@ -3,3 +3,4 @@
 # Cloud's deploy stays fast and light.
 -r requirements.txt
 jupyterlab==4.5.1
+imbalanced-learn==0.14.2
