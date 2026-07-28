@@ -204,18 +204,76 @@ merged_stunting |>
     theme(
         axis.text = element_text(color = "black"),
         axis.text.x = element_text(angle = 90, vjust = .5)) 
-        
-## Prevalence maps
-
-
 ```
 
+
 @fig-prev-counties shows the weighted prevalence of stunting among children 6-59 months at the subnational levels with the blue dotted line showing the weighted national prevalence.
+
+```{r}
+#| label: fig-prev-map
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels"
+        
+## Prevalence maps
+merged_stunting |> 
+    mutate(
+        prevalence_bin = cut(
+            prevalence,
+            breaks = c(0, 10, 20, 30, 40, 50),
+            labels = c("0–10", "11–20", "21–30", "31–40", "41–50"),
+            include.lowest = TRUE)) |> 
+    ggplot() + 
+    geom_sf(aes(fill = prevalence_bin)) + 
+    scale_fill_brewer(palette = 6) +
+    labs(
+        fill = "Prevalence (%)") + 
+    theme_minimal(base_family = "Candara", base_size = 14) +
+    theme(
+        axis.text = element_blank(),
+        legend.background = element_rect(color = "gray70"),
+        panel.grid = element_blank()) 
+    
+```
+
+
+@fig-prev-map shows the weighted prevalence of stunting among children 6-59 months at the subnational levels. Darker shades shows increasing prevalence
 
 
 ## Immunisation, restricted to children 12-23 months
 Immunisation analysis was restricted to only 12-23 months. Full vaccination was defined as having taken BCG, HepB (birth dose), 3 doses of DPT-HepB-Hib, 3 [4] doses of OPV, 1 dose of IPV, 3 [2] doses of pneumococcal vaccine, 3 [2] doses of rotavirus vaccine, and 1 dose of MCV, according to the national vaccination schedule.
 
+#### National weighted n and prevalence of stunting
+```{r}
 
+#| label: immunisation-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_immunn_12_23 <- df |> 
+    filter(
+        age_months >= 12 & age_months < 24) |> 
+    mutate(
+        fully_vaccinated = 
+            ifelse(
+            h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
+
+            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
+            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
+            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
+            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
+            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
+
+            
+
+            )
+
+    )
+
+```
 
 
