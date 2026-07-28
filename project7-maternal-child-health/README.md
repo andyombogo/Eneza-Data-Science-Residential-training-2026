@@ -76,7 +76,7 @@ project7-maternal-child-health/
 ├── pages/
 │   ├── overview.py                # landing page: project summary, task ownership/status
 │   ├── task1_risk_classifier.py  # Task 1: interactive predictor + model report
-│   ├── task2_regional_indicators.py  # Task 2 placeholder (not started)
+│   ├── task2_regional_indicators.py  # Task 2: stunting metrics/charts from data/processed/
 │   ├── task3_fairness_calibration.py # Task 3 placeholder (not started)
 │   └── task4_interventions.py        # Task 4 placeholder (not started)
 ├── .streamlit/config.toml         # app theme
@@ -85,9 +85,13 @@ project7-maternal-child-health/
 ├── src/
 │   └── task1_risk_classifier.py  # Task 1: load data, split, train, evaluate, save model
 ├── notebooks/
-│   └── task1_risk_classifier_eda.ipynb  # Task 1: EDA, SMOTE check, model comparison, tuning
+│   ├── task1_risk_classifier_eda.ipynb   # Task 1: EDA, SMOTE check, model comparison, tuning
+│   └── task2_regional_indicators.qmd     # Task 2: KDHS analysis source (needs R + restricted data)
 ├── data/
-│   └── raw/                      # gitignored — populated by download_data.py
+│   ├── raw/                      # gitignored — populated by download_data.py
+│   └── processed/                # committed — small, aggregate, non-restricted derived data
+│       ├── task2_stunting_summary.json
+│       └── task2_haz_histogram.png
 └── models/
     └── risk_classifier.joblib    # gitignored — trained model artifact
 ```
@@ -348,14 +352,34 @@ project task, so it's ready to grow as Tasks 2–4 land without a rebuild:
   - **Methodology & Ethics** — the stratification demonstration from
     Section 7 (recomputed live), the SMOTE decision from Section 6, and
     limitations.
-- **📊 Task 2 / ⚖️ Task 3 / 🎯 Task 4** — placeholder pages showing each task's
+- **📊 Task 2 — Regional Indicators** — national child-stunting prevalence
+  (17.4%, KDHS 2022) with metrics, a real HAZ-score histogram, and a
+  sample-to-estimate funnel chart, all read from a small committed aggregate
+  file (`data/processed/task2_stunting_summary.json`) rather than any
+  restricted microdata. An honest "what's next" section lists county-level
+  breakdown, immunisation, skilled birth attendance, and wealth quintile as
+  pending — no placeholder numbers standing in for unfinished analysis.
+- **⚖️ Task 3 / 🎯 Task 4** — placeholder pages showing each task's
   description, owners, and status, so the app is already presentation-ready
   for the whole group; each becomes a real page as that task is built.
 
 Only the Task 1 page imports the heavy stack (pandas/sklearn/matplotlib) — the
-other pages are plain text, so switching to them is instant even before
-they're built out. The 6-model comparison is gated behind a button rather than
-computed on every page load, so first paint stays fast (~3s cold).
+Task 2 page needs only `pandas` (for the funnel chart) plus the standard
+library; Task 3/4 import nothing beyond `streamlit`. Switching between pages
+stays fast. The 6-model comparison on Task 1 is gated behind a button rather
+than computed on every page load, so first paint stays fast (~3s cold).
+
+**Why Task 2 isn't a standalone report:** the original Task 2 work
+(`task2-regional-indicators` branch) was a Quarto/R document
+(`Project7_task2.qmd`) rendered to a static HTML file. That HTML has been
+removed from the repo — investigation before merging found it was stale
+(rendered before the branch's last commit) and referenced a chart image that
+was never committed, so keeping it would have shipped a broken, out-of-date
+report. The `.qmd` source is kept (`notebooks/task2_regional_indicators.qmd`,
+content untouched) since it's the authored analysis and needs a restricted
+DHS microdata file to re-run; its actual output numbers were extracted once
+into `data/processed/` for the Streamlit page to use, so the whole project
+now lives in one cohesive app instead of one task being a separate document.
 
 **No committed model or data file is required to run it.** On first load the
 Task 1 page tries `data/raw/maternal_health_risk.csv`; if that's absent (e.g.

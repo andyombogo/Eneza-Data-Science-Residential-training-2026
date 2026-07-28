@@ -29,7 +29,7 @@ tasks = pd.DataFrame(
             "#": 2,
             "Task": "Kenyan maternal/child indicators by region & wealth quintile",
             "Owners": "Kevinson Mwangi, Elphas Abok",
-            "Status": "🚧 Not started",
+            "Status": "🟡 In progress (stunting: national done, county-level pending)",
         },
         {
             "#": 3,
