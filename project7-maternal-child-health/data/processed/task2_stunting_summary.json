@@ -1,0 +1,27 @@
+{
+  "source": "Kenya Demographic and Health Survey (KDHS) 2022, Kids' Recode (KR) file",
+  "source_access": "restricted -- obtained via an approved data request to The DHS Program (dhsprogram.com); the raw microdata file is not redistributable and is not committed to this repository",
+  "analysis_author": "Kevinson Mwangi, Elphas Abok",
+  "analysis_source_file": "notebooks/task2_regional_indicators.qmd",
+  "extracted_from": "rendered output committed at project7-setup merge commit 147a75d (see git history), read 2026-07-28",
+  "methodology": "Youngest living child per mother kept per household. Stunting defined as height-for-age z-score (HAZ) < -2 SD, WHO 2006 growth reference standards. Estimates are survey-weighted (v005) and account for the two-stage cluster sample design (primary sampling unit = v021, strata = v022).",
+  "sample": {
+    "total_children_all_ages": 13528,
+    "total_clusters": 1689,
+    "stunting_analysis_n_6_59_months": 11715
+  },
+  "national": {
+    "stunting_prevalence_weighted_pct": 17.4,
+    "stunting_prevalence_ci": null,
+    "stunting_prevalence_ci_note": "not computed in the source analysis (table statistic was n (%) only, no CI requested)"
+  },
+  "subnational": {
+    "status": "not available",
+    "note": "County-level prevalence with 95% CIs is written in notebooks/task2_regional_indicators.qmd (svyby + svyciprop by county, merged to a Kenya counties shapefile via rKenyaCensus) but the rendered output image was never committed to git, and the current HTML render predates this code being added. Re-running that chunk and exporting stunting_county (county, prevalence, lb, ub) to CSV would make this section real."
+  },
+  "not_yet_analysed": [
+    "skilled birth attendance",
+    "immunisation coverage (code present in the .qmd but incomplete/contains a syntax error -- the fully_vaccinated ifelse() is missing its TRUE/FALSE branches)",
+    "wealth quintile breakdown (no wealth-quintile variable used anywhere in the current analysis)"
+  ]
+}

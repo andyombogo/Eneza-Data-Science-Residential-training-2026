@@ -5,6 +5,25 @@ date: today
 format: html
 ---
 
+<!--
+Prerequisites to render this document (not part of the analysis itself):
+
+- R with: tidyverse, haven, labelled, epiDisplay, survey, gtsummary,
+  extrafont, flextable, rKenyaCensus, sf
+- The KDHS 2022 Kids' Recode file (KEKR8BFL.DTA), obtained via an approved
+  data request to The DHS Program (dhsprogram.com). This file is
+  restricted-access and is not, and cannot be, committed to this repo --
+  update the read_dta() path below to point at your own local copy.
+
+The Streamlit app's Task 2 page (pages/task2_regional_indicators.py) does
+not re-run this document -- it reads the aggregate, non-identifying numbers
+already extracted into data/processed/task2_stunting_summary.json. If you
+add new results here (e.g. the county-level table or immunisation
+estimates), export them to that JSON/a CSV in data/processed/ so the app
+can pick them up; see that file's "subnational" and "not_yet_analysed"
+notes for exactly what's missing.
+-->
+
 ## Loading the KDHS Data 2022 (KR Record)
 ```{r}
 #| label: setup
