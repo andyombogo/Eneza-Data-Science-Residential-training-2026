@@ -77,16 +77,18 @@ project7-maternal-child-health/
 │   ├── overview.py                # landing page: project summary, task ownership/status
 │   ├── task1_risk_classifier.py  # Task 1: interactive predictor + model report
 │   ├── task2_regional_indicators.py  # Task 2: stunting metrics/charts from data/processed/
-│   ├── task3_fairness_calibration.py # Task 3 placeholder (not started)
+│   ├── task3_fairness_calibration.py # Task 3: age-group fairness + calibration audit
 │   └── task4_interventions.py        # Task 4 placeholder (not started)
 ├── .streamlit/config.toml         # app theme
 ├── scripts/
 │   └── download_data.py          # fetches raw dataset from UCI repo (not committed)
 ├── src/
-│   └── task1_risk_classifier.py  # Task 1: load data, split, train, evaluate, save model
+│   ├── task1_risk_classifier.py  # Task 1: load data, split, train, evaluate, save model
+│   └── task3_fairness_audit.py   # Task 3: age grouping, out-of-fold predictions, fairness/calibration metrics
 ├── notebooks/
-│   ├── task1_risk_classifier_eda.ipynb   # Task 1: EDA, SMOTE check, model comparison, tuning
-│   └── task2_regional_indicators.qmd     # Task 2: KDHS analysis source (needs R + restricted data)
+│   ├── task1_risk_classifier_eda.ipynb          # Task 1: EDA, SMOTE check, model comparison, tuning
+│   ├── task2_regional_indicators.qmd            # Task 2: KDHS analysis source (needs R + restricted data)
+│   └── task3_fairness_calibration_audit.ipynb   # Task 3: fairness + calibration audit
 ├── data/
 │   ├── raw/                      # gitignored — populated by download_data.py
 │   └── processed/                # committed — small, aggregate, non-restricted derived data
@@ -175,9 +177,13 @@ this imbalance ratio: Random Forest's per-tree bootstrap sampling and 272 real
 `high risk` examples already give it enough minority-class signal that
 synthetic examples add little. **Decision: no resampling in the production
 pipeline** (`src/task1_risk_classifier.py`) — it would add a dependency and a
-leakage risk for no measurable benefit. Revisited if Task 3's fairness audit
-finds the model under-serving `high risk` cases in a way accuracy-style
-metrics don't capture.
+leakage risk for no measurable benefit. Task 3's fairness audit (now
+complete — see [Section 12](#12-live-demo-app) and
+`notebooks/task3_fairness_calibration_audit.ipynb`) checked this from a
+different angle: overall `high risk` recall is strong (91–96% across age
+groups), but recall specifically for adolescent mothers is lower (~85%) — a
+real, CI-supported gap, though a subgroup fairness issue rather than the
+class-wide imbalance problem SMOTE targets.
 
 ## 7. Why a stratified train/test split?
 
@@ -286,12 +292,15 @@ importances confirm the model leans on `BS` and the two blood-pressure
 readings most heavily, matching both the EDA and clinical expectation; full
 breakdown and plots are in the notebook.
 
-### Suggested next steps (not yet implemented)
+### Suggested next steps
 
-- Probability calibration check (are predicted probabilities trustworthy, not
-  just the top class?) — planned as part of the Task 3 calibration audit.
+- ~~Probability calibration check~~ — **done**, see Task 3
+  (`notebooks/task3_fairness_calibration_audit.ipynb`): `high risk` is
+  well-calibrated (lowest Brier score of the three classes), `mid risk` is
+  the least reliable.
 - SHAP values for per-prediction explanations, useful if this were ever shown
-  to a clinician rather than just reported in aggregate.
+  to a clinician rather than just reported in aggregate — still not
+  implemented.
 
 ## 10. Limitations & ethical considerations
 
@@ -301,16 +310,22 @@ breakdown and plots are in the notebook.
 - **Population mismatch risk.** The training data comes from health facilities
   in Bangladesh. Vitals thresholds and risk patterns may not transfer directly
   to a Kenyan population — this is a key caveat to flag before any real-world
-  use, and motivates the fairness/calibration audit in Task 3.
+  use. Task 3's fairness audit was run on this same Bangladeshi data; whether
+  its findings (below) replicate on a Kenyan population is an open question.
 - **Class imbalance & cost asymmetry.** `high risk` is the minority class
   (27%) and also the class where false negatives (predicting `low`/`mid` when
   truly `high risk`) are most dangerous. This is why the split is stratified
   (Section 7) and why recall — not just accuracy — is reported per class
   (Section 9), even though the imbalance was mild enough not to need
   resampling (Section 6).
-- **Fairness across subgroups.** Task 3 (see `PLAN.md`) audits this model's
-  performance and calibration across age groups to check it doesn't
-  systematically under- or over-flag risk for any subgroup.
+- **Fairness across subgroups — a real gap found.** Task 3 audited this
+  model's performance and calibration across age groups (see Section 12 and
+  `notebooks/task3_fairness_calibration_audit.ipynb`). Finding: the model
+  catches true `high risk` cases less often for mothers under 20 (~85%
+  recall) than for the 20–34 reference group (~96%) — a statistically
+  real gap (95% CIs barely overlap), not noise. Precision stays perfect for
+  the under-20 group, so the failure mode is specifically under-flagging,
+  not over-flagging. See Task 3's recommendations for mitigation.
 - **Data protection.** Although this dataset is de-identified and public,
   any future work with real patient-level data (e.g. Kenyan facility records)
   must follow the Kenya Data Protection Act, 2019, and be documented in the
@@ -325,12 +340,11 @@ with confusion matrix + classification report + feature importances, a live
 demonstration of why the split is stratified, saved model artifact, fully
 executed reproducible notebook, pinned dependencies.
 
-**Open (optional refinements, not blockers):** probability calibration check,
-per-prediction explanations (SHAP).
+**Open (optional refinement, not a blocker):** per-prediction explanations
+(SHAP). Probability calibration is now checked — see Task 3.
 
-See `PLAN.md` for the status of Tasks 2–4 (regional/wealth EDA, fairness &
-calibration audit, intervention targeting) and for task ownership within the
-group.
+See `PLAN.md` for the status of Tasks 2 and 4 (regional/wealth EDA,
+intervention targeting) and for task ownership within the group.
 
 ## 12. Live demo app
 
@@ -359,15 +373,23 @@ project task, so it's ready to grow as Tasks 2–4 land without a rebuild:
   restricted microdata. An honest "what's next" section lists county-level
   breakdown, immunisation, skilled birth attendance, and wealth quintile as
   pending — no placeholder numbers standing in for unfinished analysis.
-- **⚖️ Task 3 / 🎯 Task 4** — placeholder pages showing each task's
-  description, owners, and status, so the app is already presentation-ready
-  for the whole group; each becomes a real page as that task is built.
+- **⚖️ Task 3 — Fairness & Calibration Audit** — audits the Task 1 model
+  using out-of-fold predictions across the full dataset (more statistical
+  power per age subgroup than the 203-row test set alone). Headline metrics,
+  a high-risk-recall-by-age-group chart with 95% CIs, per-group confusion
+  matrices, per-class Brier scores and reliability curves, and concrete
+  recommendations — same page structure and rigor as Task 1, on
+  `task3-fairness-calibration` branch pending merge into this one.
+- **🎯 Task 4** — placeholder page showing the task's description, owners,
+  and status; becomes a real page once built.
 
-Only the Task 1 page imports the heavy stack (pandas/sklearn/matplotlib) — the
-Task 2 page needs only `pandas` (for the funnel chart) plus the standard
-library; Task 3/4 import nothing beyond `streamlit`. Switching between pages
-stays fast. The 6-model comparison on Task 1 is gated behind a button rather
-than computed on every page load, so first paint stays fast (~3s cold).
+Task 1 and Task 3 import the heavy stack (pandas/sklearn/matplotlib) since
+both train/evaluate models; Task 2 needs only `pandas` plus the standard
+library; Task 4 imports nothing beyond `streamlit`. The 6-model comparison
+on Task 1 and the out-of-fold audit on Task 3 are the two heavier
+computations in the app — Task 1's is gated behind a button (first paint
+~3s cold); Task 3's runs eagerly since it *is* the page's content (~3.5s
+cold), cached after that.
 
 **Why Task 2 isn't a standalone report:** the original Task 2 work
 (`task2-regional-indicators` branch) was a Quarto/R document

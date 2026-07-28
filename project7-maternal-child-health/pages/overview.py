@@ -34,8 +34,8 @@ tasks = pd.DataFrame(
         {
             "#": 3,
             "Task": "Fairness audit (age groups) & calibration check",
-            "Owners": "TBD",
-            "Status": "🚧 Not started",
+            "Owners": "John Andrew, Jared Onsomu",
+            "Status": "✅ Done (on task3-fairness-calibration branch, pending review/merge)",
         },
         {
             "#": 4,
