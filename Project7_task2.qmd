@@ -7,7 +7,7 @@ format: html
 
 ## Loading the KDHS Data 2022 (KR Record)
 ```{r}
-#| label: setup
+#| label: package-setup
 #| message: false
 #| warning: false
 #| cache: false
@@ -20,8 +20,19 @@ pacman::p_load(
   tidyverse, haven, labelled, epiDisplay, survey,
   gtsummary, extrafont, flextable, rKenyaCensus, sf, rineq)
 
-# Plotting functions
-## Pointrange graphs
+# Data
+df <- read_dta("../Mini project/Data/KEKR8BDT/KEKR8BFL.DTA")
+
+```
+
+
+```{r}
+#| label: plotting-functions-pointrange
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
 plot_pointrange <- 
     function(data, x_var, estimate, lower, upper, 
     reference_line = NULL, y_limits = c(5, 50),
@@ -68,7 +79,16 @@ plot_pointrange <-
   return(p)
 }
 
-## Maps
+```
+
+
+```{r}
+#| label: plotting-functions-maps
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
 plot_map <- function(
     data, fill, breaks, labels, legend_title, subtitle, palette = "YlGnBu", direction = 1) {
 
@@ -97,15 +117,15 @@ plot_map <- function(
       axis.text = element_blank(),
       plot.subtitle = element_text(hjust = .6, vjust = -8),
       legend.background = element_rect(color = "gray70"),
-      legend.position = c(0.2, 0.18),
+      legend.title = element_text(size = 10.5),
+      legend.text = element_text(size = 10.5),
+      legend.position = c(0.15, 0.16),
       panel.grid = element_blank()
     )
 }
 
-# Data
-df <- read_dta("../Mini project/Data/KEKR8BDT/KEKR8BFL.DTA")
-
 ```
+
 
 ## Data preparation
 ```{r}
@@ -144,6 +164,7 @@ df <- df |>
         wealth_q = v190
     )
 ```
+
 
 The datasets includes a total of `r dim(df)[[1]]` children from `r length(unique(df$v001))` clusters across Kenya. 
 
@@ -214,7 +235,7 @@ tbl <- tbl_svysummary(
 Stunting was defined as height-for-age z-score (HAZ) < -2 based on the WHO 2006 growth reference standards. The analysis included a total of `r dim(df_stunting)[[1]]`. According to the WHO guidelines, HAZ scores range from -6 to 6 and this was ascertained for the data as shown in @fig-stunting. The data was then survey-set to account for the two-stage sampling design of DHS. The weighted n (prevalence %) of stunting among the 6-59 months old children was `r tbl$table_body[3, 6][[1]]`.
 
 
-#### Does stunting vary by region (subnationa level/county)?
+#### Does stunting vary by region (subnational levels/counties)?
 
 ```{r}
 #| label: fig-prev-counties
@@ -342,7 +363,6 @@ cc_plot_data <- bind_rows(
 ```
 
 ```{r}
-
 #| label: fig-concentration-curves-plotting
 #| message: false
 #| warning: false
@@ -385,20 +405,22 @@ cc_plot_data |>
 ```
 
 
-## Immunisation, restricted to children 12-23 months
-Immunisation analysis was restricted to only 12-23 months. Full vaccination was defined as having taken BCG, HepB (birth dose), 3 doses of DPT-HepB-Hib, 3 [4] doses of OPV, 1 dose of IPV, 3 [2] doses of pneumococcal vaccine, 3 [2] doses of rotavirus vaccine, and 1 dose of MCV, according to the national vaccination schedule.
+## Immunisation
 
-#### National weighted n and prevalence of stunting
+Vaccination analysis was restricted to only 12-23 and 24-35 months. Full vaccination was defined differently for these two groups of children according to the national vaccination schedule.
+
+### Distribution of full vaccination at the national and subnational levels, children 12-23 months
+
+Full vaccination was defined as having taken one dose of BCG vaccine,oral polio vaccine (OPV, birth dose), three doses of OPV and one dose of inactivated polio vaccine (IPV), three doses of DPT-HepB-Hib, three doses of pneumococcal conjugate vaccine (PCV), two doses of Rotavirus vaccine (RV), and One dose of measles rubella (MR) among children 12-23 months.
+
 ```{r}
-
-#| label: immunisation-prep
+#| label: immunisation-prep-1
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
 
 # Defining fully vaccinated children 12-23 years
-
 df_immunn_12_23 <- df |> 
     filter(
         age_months >= 12 & age_months < 24) |> 
@@ -426,11 +448,22 @@ df_immunn_12_23 <- df |>
             h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
 
             h9 %in% c(1, 2, 3)  # Measles rubella 1
-            ), "Fully vaccinated", "Not fully vaccinated")
+            ), "Fully vaccinated", "Not fully vaccinated"),
+        fully_vacc = ifelse(
+            fully_vaccinated == "Fully vaccinated", 0, 1)
     )
 
+```
 
-# Survey setting
+Survey setting step
+
+```{r}
+#| label: immunisation-prep-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
 immunn_survey_12_23 <- svydesign(
   id = ~v021, # primary sampling unit       
   strata = ~v022, # strata     
@@ -439,8 +472,17 @@ immunn_survey_12_23 <- svydesign(
   nest = TRUE)  
 
 options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+```
 
-# Weighted prevalence of stunting
+Weighted prevalence of full vaccination - national level
+
+```{r}
+#| label: weighted-prev-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
 tbl_immun_12_23 <- tbl_svysummary(
   immunn_survey_12_23,
   include = fully_vaccinated,
@@ -450,72 +492,18 @@ tbl_immun_12_23 <- tbl_svysummary(
   missing_text = "Missing",
   label = fully_vaccinated ~ "Vaccination status")
 
-# Defining fully vaccinated children 24-35 years
-df_immunn_24_35 <- df |> 
-    filter(
-        age_months >= 24 & age_months < 36) |> 
-    mutate(
-        fully_vaccinated = 
-            ifelse(
-
-            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
-
-            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
-            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
-            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
-            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
-            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
-
-            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
-            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
-            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
-
-            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
-            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
-            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
-
-            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
-            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
-
-            h9 %in% c(1, 2, 3) &  # Measles rubella 1
-            h9a %in% c(1, 2, 3)   # Measles rubella 2
-            ), "Fully vaccinated", "Not fully vaccinated")
-    )
-
-
-# Survey setting
-immunn_survey_24_35 <- svydesign(
-  id = ~v021, # primary sampling unit       
-  strata = ~v022, # strata     
-  weights = ~wt,       
-  data = df_immunn_24_35,
-  nest = TRUE)  
-
-options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
-
-# Weighted prevalence 
-tbl_immun_24_35 <- tbl_svysummary(
-  immunn_survey_24_35,
-  include = fully_vaccinated,
-  statistic = all_categorical() ~ "{n} ({p})",
-  digits = all_categorical() ~ c(1, 1),
-  missing = "ifany",
-  missing_text = "Missing",
-  label = fully_vaccinated ~ "Vaccination status")
-
 ```
 
-
+Weighted prevalence of full vaccination - subnational levels
 
 ```{r}
-#| label: fig-prev-counties-immunisation
+#| label: fig-prev-counties-immunisation-12_23
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Weighted prevalence of full vacciantion among children 12-23 and 24-35 months at the subnationa levels. The blue line represents the national weighted prevalence"
+#| fig-cap: "Weighted prevalence of full vacciantion among children 12-23 months at the subnationa levels. The blue line represents the national weighted prevalence"
 
-# 12-23 months
 county_immunn_12_23 <- svyby(
   ~ I(fully_vaccinated == "Fully vaccinated"),
   by = ~v024,
@@ -561,7 +549,210 @@ plot_pointrange(
     y_breaks = seq(0, 100, 10),
     y_label = "Weighted prevalence (%)")
 
-# 24-35 months
+```
+
+Spatial distribution of full vacciantion among children 12-23 months at the subnationa level
+
+```{r}
+#| label: fig-prev-maps-immunn-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Spatial distribution of full vacciantion among children 12-23 months at the subnationa level"
+
+figa <- plot_map(
+  merged_immunn_12_23,
+  fill = prevalence,
+  breaks = c(0, 20, 40, 60, 80, 100),
+  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
+  legend_title = "Prevalence (%)",
+  subtitle = "12–23 months",
+  palette = 8,
+  direction = -1
+)
+
+figa
+
+```
+
+
+Concentration curve for full vaccination by cumulative percentage of the population ranked by wealth index
+
+Data preparation step
+
+```{r}
+#| label: concentration-curves-data-prep-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+cc_df_immunn_12_23 <- df_immunn_12_23 |>   
+    filter(!is.na(fully_vacc), !is.na(wealth_cont), !is.na(wt)) |>     
+    arrange(wealth_cont) |> 
+    mutate(
+    pop_rank = cumsum(wt) - wt / 2, # midpoint rank within own weight mass
+    pop_rank = pop_rank / sum(wt)) |> 
+  group_by(wealth_cont) |>   # collapse exact ties
+  mutate(pop_rank = mean(pop_rank)) |> # give tied group its average rank
+  ungroup() |> 
+  arrange(pop_rank) |> 
+  mutate(
+        cum_prop = cumsum(wt) / sum(wt),
+        cum_full_vacc = cumsum(fully_vacc*wt) / sum(fully_vacc*wt))
+
+
+cc_plot_data_immunn_12_23 <- bind_rows(
+  data.frame(cum_prop = 0, cum_full_vacc = 0),
+  cc_df_immunn_12_23 |> select(cum_prop, cum_full_vacc)) # Adding (0, 0) for plotting
+
+```
+
+Generating concentration index and plotting
+
+```{r}
+#| label: fig-concentration-curves-plotting-immunn-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curves showing "
+
+## Concentration index
+ci_result_immunn_12_23 <- ci(
+  ineqvar = df_immunn_12_23$wealth_cont,
+  outcome = df_immunn_12_23$fully_vacc,
+  weights = df_immunn_12_23$wt,
+  type    = "CIw")
+
+cc_plot_data_immunn_12_23 |> 
+  ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_abline(
+    slope = 1, intercept = 0,
+     color = "#813134") +
+  annotate(
+    "text",
+    x = 0.05, y = 0.95,
+    label = paste0(
+      "Concentration index (95% CI) = ",
+      round(ci_result_immunn_12_23$concentration_index, 2),
+      " (",
+      round(confint(ci_result_immunn_12_23)[[1]], 2), ",",
+      round(confint(ci_result_immunn_12_23)[[2]], 2), ")"),
+    family = "Candara",
+    hjust = 0, vjust = 1,
+    size = 4.0) +
+  labs(
+    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    y = "Cumulative % of non fully vaccinated children",
+    subtitle = "12-23 months") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(
+    panel.grid = element_blank())
+
+```
+
+
+### Distribution of full vaccination at the national and subnational levels, children 24-35 months
+
+Full vaccination was defined as having taken one dose of BCG vaccine,oral polio vaccine (OPV, birth dose), three doses of OPV and one dose of inactivated polio vaccine (IPV), three doses of DPT-HepB-Hib, three doses of pneumococcal conjugate vaccine (PCV), two doses of Rotavirus vaccine (RV), and two doses of measles rubella (MR) among children 24-35 months.
+
+```{r}
+#| label: immunisation-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Defining fully vaccinated children 24-35 years
+df_immunn_24_35 <- df |> 
+    filter(
+        age_months >= 24 & age_months < 36) |> 
+    mutate(
+        fully_vaccinated = 
+            ifelse(
+
+            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
+
+            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
+            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
+            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
+            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
+            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
+
+            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
+            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
+            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
+
+            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
+            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
+            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
+
+            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
+            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
+
+            h9 %in% c(1, 2, 3) &  # Measles rubella 1
+            h9a %in% c(1, 2, 3)   # Measles rubella 2
+            ), "Fully vaccinated", "Not fully vaccinated"),
+        fully_vacc = ifelse(
+            fully_vaccinated == "Fully vaccinated", 0, 1)        
+    )
+
+```
+
+Survey setting step
+
+```{r}
+#| label: immunisation-prep-24_35
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| 
+immunn_survey_24_35 <- svydesign(
+  id = ~v021, # primary sampling unit       
+  strata = ~v022, # strata     
+  weights = ~wt,       
+  data = df_immunn_24_35,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+
+```
+
+
+Weighted prevalence of full vaccination - national level
+
+```{r}
+#| label: weighted-prev-24_35
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+tbl_immun_24_35 <- tbl_svysummary(
+  immunn_survey_24_35,
+  include = fully_vaccinated,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany",
+  missing_text = "Missing",
+  label = fully_vaccinated ~ "Vaccination status")
+
+```
+
+Weighted prevalence of full vaccination - subnational levels
+
+```{r}
+#| label: fig-prev-counties-immunisation-24_35
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of full vacciantion among children 24-35 months at the subnationa levels. The blue line represents the national weighted prevalence"
+
 county_immunn_24_35 <- svyby(
   ~ I(fully_vaccinated == "Fully vaccinated"),
   by = ~v024,
@@ -610,25 +801,15 @@ plot_pointrange(
 
 ```
 
+Spatial distribution of full vacciantion among children 12-23 months at the subnationa level
 
 ```{r}
-#| label: fig-prev-maps-immunn
+#| label: fig-prev-maps-immunn-24_35
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Prevalence of full vacciantion among children 12-23 and 24-35 months at the subnationa level"
-
-figa <- plot_map(
-  merged_immunn_12_23,
-  fill = prevalence,
-  breaks = c(0, 20, 40, 60, 80, 100),
-  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
-  legend_title = "Prevalence (%)",
-  subtitle = "12–23 months",
-  palette = 8,
-  direction = -1
-)
+#| fig-cap: "Spatial distribution of full vacciantion among children 24-35 months at the subnationa level"
 
 figb <- plot_map(
   merged_immunn_24_35,
@@ -641,7 +822,353 @@ figb <- plot_map(
   direction = -1
 )
 
-figa | figb
+figb
 
 ```
+
+
+Concentration curve for full vaccination by cumulative percentage of the population ranked by wealth index
+
+Data preparation step
+
+```{r}
+#| label: concentration-curves-data-prep-23_35
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+cc_df_immunn_24_35 <- df_immunn_24_35 |>   
+    filter(!is.na(fully_vacc), !is.na(wealth_cont), !is.na(wt)) |>     
+    arrange(wealth_cont) |> 
+    mutate(
+    pop_rank = cumsum(wt) - wt / 2, # midpoint rank within own weight mass
+    pop_rank = pop_rank / sum(wt)) |> 
+  group_by(wealth_cont) |>   # collapse exact ties
+  mutate(pop_rank = mean(pop_rank)) |> # give tied group its average rank
+  ungroup() |> 
+  arrange(pop_rank) |> 
+  mutate(
+        cum_prop = cumsum(wt) / sum(wt),
+        cum_full_vacc = cumsum(fully_vacc*wt) / sum(fully_vacc*wt))
+
+
+cc_plot_data_immunn_24_35 <- bind_rows(
+  data.frame(cum_prop = 0, cum_full_vacc = 0),
+  cc_df_immunn_24_35 |> select(cum_prop, cum_full_vacc)) # Adding (0, 0) for plotting
+
+```
+
+Generating concentration index and plotting
+
+```{r}
+#| label: fig-concentration-curves-plotting-immunn-24_35
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curves showing "
+
+## Concentration index
+ci_result_immunn_24_35 <- ci(
+  ineqvar = df_immunn_24_35$wealth_cont,
+  outcome = df_immunn_24_35$fully_vacc,
+  weights = df_immunn_24_35$wt,
+  type    = "CIw")
+
+cc_plot_data_immunn_24_35 |> 
+  ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
+  geom_line(color = "lightblue", linewidth = 1) +
+  geom_abline(
+    slope = 1, intercept = 0,
+     color = "#813134") +
+  annotate(
+    "text",
+    x = 0.05, y = 0.95,
+    label = paste0(
+      "Concentration index (95% CI) = ",
+      round(ci_result_immunn_24_35$concentration_index, 2),
+      " (",
+      round(confint(ci_result_immunn_24_35)[[1]], 2), ",",
+      round(confint(ci_result_immunn_24_35)[[2]], 2), ")"),
+    family = "Candara",
+    hjust = 0, vjust = 1,
+    size = 4.0) +
+  labs(
+    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    y = "Cumulative % of non fully vaccinated children",
+    subtitle = "24-35 months") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(
+    panel.grid = element_blank())
+```
+
+
+
+
+## Skilled birth attendance
+
+Skilled birth attendance (SBA) analysis was restricted to only children 0-35 months. In KDHS 2022, SBA questions were only applicable to mothers whose youngest child was aged 0-35 months. 
+
+### Distribution of skilled birth attendance at the national and subnational levels, children 0-35 months
+
+```{r}
+#| label: sba-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Defining fully vaccinated children 12-23 years
+df_sba <- df |>
+  filter(!is.na(m3a), !is.na(m3b)) 
+
+
+df_immunn_12_23 <- df |> 
+    filter(
+        age_months >= 12 & age_months < 24) |> 
+    mutate(
+        fully_vaccinated = 
+            ifelse(
+
+            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
+
+            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
+            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
+            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
+            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
+            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
+
+            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
+            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
+            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
+
+            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
+            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
+            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
+
+            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
+            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
+
+            h9 %in% c(1, 2, 3)  # Measles rubella 1
+            ), "Fully vaccinated", "Not fully vaccinated"),
+        fully_vacc = ifelse(
+            fully_vaccinated == "Fully vaccinated", 0, 1)
+    )
+
+```
+
+Survey setting step
+
+```{r}
+#| label: immunisation-prep-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+immunn_survey_12_23 <- svydesign(
+  id = ~v021, # primary sampling unit       
+  strata = ~v022, # strata     
+  weights = ~wt,       
+  data = df_immunn_12_23,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+```
+
+Weighted prevalence of full vaccination - national level
+
+```{r}
+#| label: weighted-prev-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+tbl_immun_12_23 <- tbl_svysummary(
+  immunn_survey_12_23,
+  include = fully_vaccinated,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany",
+  missing_text = "Missing",
+  label = fully_vaccinated ~ "Vaccination status")
+
+```
+
+Weighted prevalence of full vaccination - subnational levels
+
+```{r}
+#| label: fig-prev-counties-immunisation-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence of full vacciantion among children 12-23 months at the subnationa levels. The blue line represents the national weighted prevalence"
+
+county_immunn_12_23 <- svyby(
+  ~ I(fully_vaccinated == "Fully vaccinated"),
+  by = ~v024,
+  design = immunn_survey_12_23,
+  FUN = svyciprop,
+  vartype = "ci",
+  na.rm = TRUE)
+
+immunn_12_23_county <- county_immunn_12_23 |> 
+    mutate(
+        county = v024,
+        prevalence = `I(fully_vaccinated == "Fully vaccinated")`,
+        lb = ci_l,
+        ub = ci_u,
+        group = rep("12-23 months")) |> 
+    select(county, group, prevalence, lb, ub)
+
+
+immunn_12_23_county <- immunn_12_23_county |> 
+    mutate(
+        name = names(attr(county, "labels")) |> 
+            str_to_title() |> 
+            str_replace_all("[[:punct:]]", " "))
+
+
+# Merge the prevalence data to the shp file data
+merged_immunn_12_23 <- kenya_shp |> 
+    left_join(
+        immunn_12_23_county, by = c("county" = "name")) |> 
+    mutate(
+        across(
+            c(prevalence, lb, ub), ~round(., 3)*100))
+
+# Plotting
+plot_pointrange(
+    merged_immunn_12_23, x_var = "county", estimate = "prevalence",
+    lower = lb, upper = ub,
+    reference_line = 
+        as.numeric(
+            str_extract(tbl_immun_12_23$table_body[3, 6][[1]],
+             "(?<=\\()[0-9.]+(?=\\))")),
+    y_limits = c(0, 100),
+    y_breaks = seq(0, 100, 10),
+    y_label = "Weighted prevalence (%)")
+
+```
+
+Spatial distribution of full vacciantion among children 12-23 months at the subnationa level
+
+```{r}
+#| label: fig-prev-maps-immunn-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Spatial distribution of full vacciantion among children 12-23 months at the subnationa level"
+
+figa <- plot_map(
+  merged_immunn_12_23,
+  fill = prevalence,
+  breaks = c(0, 20, 40, 60, 80, 100),
+  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
+  legend_title = "Prevalence (%)",
+  subtitle = "12–23 months",
+  palette = 8,
+  direction = -1
+)
+
+figa
+
+```
+
+
+Concentration curve for full vaccination by cumulative percentage of the population ranked by wealth index
+
+Data preparation step
+
+```{r}
+#| label: concentration-curves-data-prep-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+cc_df_immunn_12_23 <- df_immunn_12_23 |>   
+    filter(!is.na(fully_vacc), !is.na(wealth_cont), !is.na(wt)) |>     
+    arrange(wealth_cont) |> 
+    mutate(
+    pop_rank = cumsum(wt) - wt / 2, # midpoint rank within own weight mass
+    pop_rank = pop_rank / sum(wt)) |> 
+  group_by(wealth_cont) |>   # collapse exact ties
+  mutate(pop_rank = mean(pop_rank)) |> # give tied group its average rank
+  ungroup() |> 
+  arrange(pop_rank) |> 
+  mutate(
+        cum_prop = cumsum(wt) / sum(wt),
+        cum_full_vacc = cumsum(fully_vacc*wt) / sum(fully_vacc*wt))
+
+
+cc_plot_data_immunn_12_23 <- bind_rows(
+  data.frame(cum_prop = 0, cum_full_vacc = 0),
+  cc_df_immunn_12_23 |> select(cum_prop, cum_full_vacc)) # Adding (0, 0) for plotting
+
+```
+
+Generating concentration index and plotting
+
+```{r}
+#| label: fig-concentration-curves-plotting-immunn-12_23
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curves showing "
+
+## Concentration index
+ci_result_immunn_12_23 <- ci(
+  ineqvar = df_immunn_12_23$wealth_cont,
+  outcome = df_immunn_12_23$fully_vacc,
+  weights = df_immunn_12_23$wt,
+  type    = "CIw")
+
+cc_plot_data_immunn_12_23 |> 
+  ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_abline(
+    slope = 1, intercept = 0,
+     color = "#813134") +
+  annotate(
+    "text",
+    x = 0.05, y = 0.95,
+    label = paste0(
+      "Concentration index (95% CI) = ",
+      round(ci_result_immunn_12_23$concentration_index, 2),
+      " (",
+      round(confint(ci_result_immunn_12_23)[[1]], 2), ",",
+      round(confint(ci_result_immunn_12_23)[[2]], 2), ")"),
+    family = "Candara",
+    hjust = 0, vjust = 1,
+    size = 4.0) +
+  labs(
+    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    y = "Cumulative % of non fully vaccinated children",
+    subtitle = "12-23 months") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(
+    panel.grid = element_blank())
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
