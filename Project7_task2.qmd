@@ -908,7 +908,9 @@ cc_plot_data_immunn_24_35 |>
 
 ## Skilled birth attendance
 
-Skilled birth attendance (SBA) analysis was restricted to only children 0-35 months. In KDHS 2022, SBA questions were only applicable to mothers whose youngest child was aged 0-35 months. 
+Skilled birth attendance (SBA) analysis was restricted to children aged 0–35 months. In the 2022 KDHS, delivery-assistance (SBA) questions were asked only about a mother's most recent birth, and only if that child was aged 0–35 months at the time of the interview. 
+
+SBA was defined as a delivery assisted by a doctor, nurse, or midwife/clinical officer, in line with the standard DHS/WHO definition of a trained health professional able to manage normal deliveries and identify, manage, and refer obstetric complications (KDHS 2022 variables m3a, m3b). Traditional birth attendants, relatives, and other unskilled providers were not classified as skilled.
 
 ### Distribution of skilled birth attendance at the national and subnational levels, children 0-35 months
 
@@ -919,113 +921,81 @@ Skilled birth attendance (SBA) analysis was restricted to only children 0-35 mon
 #| cache: false
 #| include: true
 
-# Defining fully vaccinated children 12-23 years
 df_sba <- df |>
-  filter(!is.na(m3a), !is.na(m3b)) 
-
-
-df_immunn_12_23 <- df |> 
-    filter(
-        age_months >= 12 & age_months < 24) |> 
-    mutate(
-        fully_vaccinated = 
-            ifelse(
-
-            (h2 %in% c(1, 2, 3) & # one dose of BCG vaccine
-
-            h0 %in% c(1, 2, 3) & # Oral polio vaccine (birth dose)
-            h4 %in% c(1, 2, 3) & # Oral polio vaccine 1
-            h6 %in% c(1, 2, 3) & # Oral polio vaccine 2
-            h8 %in% c(1, 2, 3) & # Oral polio vaccine 3
-            h60 %in% c(1, 2, 3) & # one dose of inactivated polio vaccine
-
-            h3 %in% c(1, 2, 3) & # Dose 1 DPT-HepB-Hib
-            h5 %in% c(1, 2, 3) & # Does 2 DPT-HepB-Hib
-            h7 %in% c(1, 2, 3) & # Dose 3 DPT-HepB-Hib
-
-            h54 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 1
-            h55 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 2
-            h56 %in% c(1, 2, 3) & # Pneumococcal conjugate vaccine 3
-
-            h57 %in% c(1, 2, 3) & # Rotavirus vaccine 1
-            h58 %in% c(1, 2, 3) & # Rotavirus vaccine 2
-
-            h9 %in% c(1, 2, 3)  # Measles rubella 1
-            ), "Fully vaccinated", "Not fully vaccinated"),
-        fully_vacc = ifelse(
-            fully_vaccinated == "Fully vaccinated", 0, 1)
-    )
+  filter(!is.na(m3a), !is.na(m3b)) |> 
+  mutate(
+    sba = if_else(m3a == 1 | m3b == 1, "sba", "non sba"),
+    sba_num = if_else(m3a == 1 | m3b == 1, 1, 0)) 
 
 ```
 
 Survey setting step
 
 ```{r}
-#| label: immunisation-prep-12_23
+#| label: sba-svy-set
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
 
-immunn_survey_12_23 <- svydesign(
+df_sba_survey <- svydesign(
   id = ~v021, # primary sampling unit       
   strata = ~v022, # strata     
   weights = ~wt,       
-  data = df_immunn_12_23,
+  data = df_sba,
   nest = TRUE)  
 
 options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
 ```
 
-Weighted prevalence of full vaccination - national level
+Weighted prevalence of sba - national level
 
 ```{r}
-#| label: weighted-prev-12_23
+#| label: weighted-prev-sba
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
 
-tbl_immun_12_23 <- tbl_svysummary(
-  immunn_survey_12_23,
-  include = fully_vaccinated,
+tbl_sba <- tbl_svysummary(
+  df_sba_survey,
+  include = sba,
   statistic = all_categorical() ~ "{n} ({p})",
   digits = all_categorical() ~ c(1, 1),
   missing = "ifany",
   missing_text = "Missing",
-  label = fully_vaccinated ~ "Vaccination status")
+  label = sba ~ "Skilled birth attendance")
 
 ```
 
 Weighted prevalence of full vaccination - subnational levels
 
 ```{r}
-#| label: fig-prev-counties-immunisation-12_23
+#| label: fig-prev-counties-sba
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Weighted prevalence of full vacciantion among children 12-23 months at the subnationa levels. The blue line represents the national weighted prevalence"
+#| fig-cap: "Weighted prevalence of skilled birth weight among caregivers of children 0-35 months at the subnationa levels. The blue line represents the national weighted prevalence"
 
-county_immunn_12_23 <- svyby(
-  ~ I(fully_vaccinated == "Fully vaccinated"),
+county_sba <- svyby(
+  ~ I(sba == "sba"),
   by = ~v024,
-  design = immunn_survey_12_23,
+  design = df_sba_survey,
   FUN = svyciprop,
   vartype = "ci",
   na.rm = TRUE)
 
-immunn_12_23_county <- county_immunn_12_23 |> 
+sba_county <- county_sba |> 
     mutate(
         county = v024,
-        prevalence = `I(fully_vaccinated == "Fully vaccinated")`,
+        prevalence = `I(sba == "sba")`,
         lb = ci_l,
-        ub = ci_u,
-        group = rep("12-23 months")) |> 
-    select(county, group, prevalence, lb, ub)
+        ub = ci_u) |> 
+    select(county, prevalence, lb, ub)
 
 
-immunn_12_23_county <- immunn_12_23_county |> 
+sba_county <- sba_county |> 
     mutate(
         name = names(attr(county, "labels")) |> 
             str_to_title() |> 
@@ -1033,66 +1003,64 @@ immunn_12_23_county <- immunn_12_23_county |>
 
 
 # Merge the prevalence data to the shp file data
-merged_immunn_12_23 <- kenya_shp |> 
+merged_sba <- kenya_shp |> 
     left_join(
-        immunn_12_23_county, by = c("county" = "name")) |> 
+        sba_county, by = c("county" = "name")) |> 
     mutate(
         across(
             c(prevalence, lb, ub), ~round(., 3)*100))
 
 # Plotting
 plot_pointrange(
-    merged_immunn_12_23, x_var = "county", estimate = "prevalence",
+    merged_sba, x_var = "county", estimate = "prevalence",
     lower = lb, upper = ub,
     reference_line = 
         as.numeric(
-            str_extract(tbl_immun_12_23$table_body[3, 6][[1]],
+            str_extract(tbl_sba$table_body[3, 6][[1]],
              "(?<=\\()[0-9.]+(?=\\))")),
-    y_limits = c(0, 100),
-    y_breaks = seq(0, 100, 10),
+    y_limits = c(30, 100),
+    y_breaks = seq(30, 100, 10),
     y_label = "Weighted prevalence (%)")
 
 ```
 
-Spatial distribution of full vacciantion among children 12-23 months at the subnationa level
+Spatial distribution of skilled birth attendance at the subnational level
 
 ```{r}
-#| label: fig-prev-maps-immunn-12_23
+#| label: fig-prev-maps-sba
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Spatial distribution of full vacciantion among children 12-23 months at the subnationa level"
+#| fig-cap: "Spatial distribution of skilled birth attendance at the subnational level"
 
-figa <- plot_map(
-  merged_immunn_12_23,
+plot_map(
+  merged_sba,
   fill = prevalence,
-  breaks = c(0, 20, 40, 60, 80, 100),
-  labels = c("<20", "20–39.9", "40–59.9", "60–79.9", "80–100"),
+  breaks = c(50, 70, 90, 100),
+  labels = c("50-69.9", "70-89.9", "90-100"),
   legend_title = "Prevalence (%)",
-  subtitle = "12–23 months",
+  subtitle = NULL,
   palette = 8,
   direction = -1
 )
 
-figa
-
 ```
 
 
-Concentration curve for full vaccination by cumulative percentage of the population ranked by wealth index
+Concentration curve for sba by cumulative percentage of the population ranked by wealth index
 
 Data preparation step
 
 ```{r}
-#| label: concentration-curves-data-prep-12_23
+#| label: concentration-curves-data-prep-sba
 #| message: false
 #| warning: false
 #| cache: false
 #| include: true
 
-cc_df_immunn_12_23 <- df_immunn_12_23 |>   
-    filter(!is.na(fully_vacc), !is.na(wealth_cont), !is.na(wt)) |>     
+cc_df_sba <- df_sba |>   
+    filter(!is.na(sba_num), !is.na(wealth_cont), !is.na(wt)) |>     
     arrange(wealth_cont) |> 
     mutate(
     pop_rank = cumsum(wt) - wt / 2, # midpoint rank within own weight mass
@@ -1103,19 +1071,19 @@ cc_df_immunn_12_23 <- df_immunn_12_23 |>
   arrange(pop_rank) |> 
   mutate(
         cum_prop = cumsum(wt) / sum(wt),
-        cum_full_vacc = cumsum(fully_vacc*wt) / sum(fully_vacc*wt))
+        cum_sba = cumsum(sba_num*wt) / sum(sba_num*wt))
 
 
-cc_plot_data_immunn_12_23 <- bind_rows(
+cc_plot_data_sba <- bind_rows(
   data.frame(cum_prop = 0, cum_full_vacc = 0),
-  cc_df_immunn_12_23 |> select(cum_prop, cum_full_vacc)) # Adding (0, 0) for plotting
+  cc_df_sba |> select(cum_prop, cum_sba)) # Adding (0, 0) for plotting
 
 ```
 
 Generating concentration index and plotting
 
 ```{r}
-#| label: fig-concentration-curves-plotting-immunn-12_23
+#| label: fig-concentration-curves-plotting-sba
 #| message: false
 #| warning: false
 #| cache: false
@@ -1123,14 +1091,14 @@ Generating concentration index and plotting
 #| fig-cap: "Concentration curves showing "
 
 ## Concentration index
-ci_result_immunn_12_23 <- ci(
-  ineqvar = df_immunn_12_23$wealth_cont,
-  outcome = df_immunn_12_23$fully_vacc,
-  weights = df_immunn_12_23$wt,
+ci_result_sba <- ci(
+  ineqvar = df_sba$wealth_cont,
+  outcome = df_sba$sba_num,
+  weights = df_sba$wt,
   type    = "CIw")
 
-cc_plot_data_immunn_12_23 |> 
-  ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
+cc_plot_data_sba |> 
+  ggplot(aes(x = cum_prop, y = cum_sba)) +
   geom_line(color = "darkgreen", linewidth = 1) +
   geom_abline(
     slope = 1, intercept = 0,
@@ -1140,17 +1108,16 @@ cc_plot_data_immunn_12_23 |>
     x = 0.05, y = 0.95,
     label = paste0(
       "Concentration index (95% CI) = ",
-      round(ci_result_immunn_12_23$concentration_index, 2),
+      round(ci_result_sba$concentration_index, 2),
       " (",
-      round(confint(ci_result_immunn_12_23)[[1]], 2), ",",
-      round(confint(ci_result_immunn_12_23)[[2]], 2), ")"),
+      round(confint(ci_result_sba)[[1]], 2), ",",
+      round(confint(ci_result_sba)[[2]], 2), ")"),
     family = "Candara",
     hjust = 0, vjust = 1,
     size = 4.0) +
   labs(
     x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
-    y = "Cumulative % of non fully vaccinated children",
-    subtitle = "12-23 months") +
+    y = "Cumulative % of skilled birth attendance") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
     panel.grid = element_blank())
