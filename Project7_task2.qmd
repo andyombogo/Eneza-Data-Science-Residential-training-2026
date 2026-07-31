@@ -1,8 +1,16 @@
 ---
-title: "Task 2: How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile."
-author: "Kevinson Mwangi & Elphas Abok"
+title: "Task 2: How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile - Descriptive and exploratory analysis"
+author: Kevinson Mwangi
 date: today
-format: html
+date-format: "DD MMMM YYYY"
+format: 
+  typst:
+    citeproc: true
+    template-partials: 
+      - typst-show.typ
+      - typst-template.typ
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Loading the KDHS Data 2022 (KR Record)
@@ -181,16 +189,22 @@ The datasets includes a total of `r dim(df)[[1]]` children from `r length(unique
 #| fig-cap: "Histogram of HAZ scores"
 
 df_stunting <- df |> 
-    filter(
-        age_months > 5 & age_months < 60) |> 
-  mutate(
+    mutate(
     hw70 = ifelse( #hw70 is the height-for-age zscore and should be divided by 100
         hw70 >
          1000, NA, hw70),
     haz = hw70/100,
     
     stunted = ifelse(haz < -2, "Stunted", "Not stunted"),
-    stun = ifelse(stunted == "Stunted", 1, 0))
+    stun = ifelse(stunted == "Stunted", 1, 0)) |> 
+    filter(
+        age_months >= 12 & age_months < 36,
+        !is.na(stunted))
+
+# Saving a copy of the data for later MBG analysis
+write_dta(
+    df_stunting, 
+    "./Data/Derived_data/df_stunting.dta")
  
 df_stunting |> 
     ggplot(
@@ -243,7 +257,7 @@ Stunting was defined as height-for-age z-score (HAZ) < -2 based on the WHO 2006 
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels. The blue line represents the national weighted prevalence"
+#| fig-cap: "Weighted prevalence of stunting among children 12-35 months at the subnationa levels. The blue line represents the national weighted prevalence"
 
 county_stunting <- svyby(
   ~ I(stunted == "Stunted"),
@@ -259,7 +273,7 @@ stunting_county <- county_stunting |>
         prevalence = `I(stunted == "Stunted")`,
         lb = ci_l,
         ub = ci_u) |> 
-    select(county, prevalence, lb, ub)
+    dplyr::select(county, prevalence, lb, ub)
 
 
 stunting_county <- stunting_county |> 
@@ -273,7 +287,7 @@ stunting_county <- stunting_county |>
 kenya_shp <- rKenyaCensus::KenyaCounties_SHP |> 
     janitor::clean_names() |> 
     st_as_sf() |> 
-    select(county) |> 
+    dplyr::select(county) |> 
     mutate(
         county = str_to_title(county) |> 
             str_replace_all("[[:punct:]]", " "))
@@ -294,11 +308,26 @@ plot_pointrange(
     lower = lb, upper = ub,
     reference_line = 
         as.numeric(
-            str_extract(tbl$table_body[3, 6][[1]],
+            str_extract(tbl$table_body[3, 7][[1]],
              "(?<=\\()[0-9.]+(?=\\))")),
-    y_limits = c(5, 50),
-    y_breaks = seq(5, 50, 5),
-    y_label = "Weighted prevalence (%)")
+    y_limits = c(0, 60),
+    y_breaks = seq(0, 60, 5),
+    y_label = "Weighted prevalence (%)") +
+  annotate(
+    geom = "text",
+    label = paste0("The blue line is the national average = ", 
+    as.numeric(
+            str_extract(tbl$table_body[3, 7][[1]],
+             "(?<=\\()[0-9.]+(?=\\))")), "%"),
+    x = 25,
+    y = 55)
+
+ggsave(
+  "./Plots/Stunting_forest_plot.png",
+  width = 10,
+  height = 6,
+  dpi = 500,
+  bg = "white")
 ```
 
 
@@ -318,7 +347,19 @@ plot_map(
     breaks = c(0, 10, 20, 30, 40, 50),
     labels = c("0–10", "11–20", "21–30", "31–40", "41–50"),
     legend_title = "Prevalence (%)", subtitle = NULL,
-    palette = 6, direction = 1)
+    palette = 6, direction = 1) + 
+  theme(
+    legend.text = element_text(size = 9),
+    legend.background = element_blank(),
+    legend.position = c(.18, .12),
+    plot.background = element_rect(fill = "gray97"))
+
+ggsave(
+  "./Plots/Stunting_map.png",
+  width = 8,
+  height = 6,
+  dpi = 500,
+  bg = "white")
     
 ```
 
@@ -358,7 +399,7 @@ cc_df <- df_stunting |>
 
 cc_plot_data <- bind_rows(
   data.frame(cum_prop = 0, cum_stunted = 0),
-  cc_df |> select(cum_prop, cum_stunted)) # Adding (0, 0) for plotting
+  cc_df |> dplyr::select(cum_prop, cum_stunted)) # Adding (0, 0) for plotting
 
 ```
 
@@ -402,16 +443,23 @@ cc_plot_data |>
   theme(
     panel.grid = element_blank())
 
+ggsave(
+  "./Plots/Stunting_concentration_curve.png",
+  width = 7,
+  height = 5,
+  dpi = 500,
+  bg = "white")
+
 ```
 
 
 ## Immunisation
 
-Vaccination analysis was restricted to only 12-23 and 24-35 months. Full vaccination was defined differently for these two groups of children according to the national vaccination schedule.
+Vaccination analysis was restricted to children aged 12-35 months. Full vaccination was defined differently for these two groups of children according to the national vaccination schedule.
 
-### Distribution of full vaccination at the national and subnational levels, children 12-23 months
+### Distribution of full vaccination at the national and subnational levels, children 12-35 months
 
-Full vaccination was defined as having taken one dose of BCG vaccine,oral polio vaccine (OPV, birth dose), three doses of OPV and one dose of inactivated polio vaccine (IPV), three doses of DPT-HepB-Hib, three doses of pneumococcal conjugate vaccine (PCV), two doses of Rotavirus vaccine (RV), and One dose of measles rubella (MR) among children 12-23 months.
+Full vaccination was defined as having taken one dose of BCG vaccine,oral polio vaccine (OPV, birth dose), three doses of OPV and one dose of inactivated polio vaccine (IPV), three doses of DPT-HepB-Hib, three doses of pneumococcal conjugate vaccine (PCV), two doses of Rotavirus vaccine (RV), and one dose of measles rubella (MR) among children 12-23 months, and additionally having received thes second dose of measles rubella of children 24-35 months.
 
 ```{r}
 #| label: immunisation-prep-1
