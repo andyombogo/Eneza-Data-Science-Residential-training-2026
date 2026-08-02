@@ -198,11 +198,18 @@ No restricted data or R installation is needed to run the app itself.
 **Deploy (Streamlit Community Cloud):** point the deploy at this branch
 (`task2-4-submission`), main file path `project7-maternal-child-health/app/Home.py`.
 `app/requirements.txt` is colocated with the entrypoint so Cloud's build
-picks it up automatically. `.python-version` is pinned at the actual
-repository root (one level above `project7-maternal-child-health/` — see
-`.python-version` there) so Streamlit Cloud's `uv` build tool finds it;
-this is unrelated to `app/requirements.txt`'s location and doesn't need to
-move again.
+picks it up automatically.
+
+`.python-version` (pinned to `3.12`) is committed in **three** places —
+the actual repository root, `project7-maternal-child-health/`, and
+`app/` — deliberately redundant because Cloud's `uv` build tool resolved
+`app/requirements.txt`'s location differently than expected after that
+file moved into `app/`, and silently fell back to the newest available
+Python (3.14) instead of the pin. On an interpreter that new, `pandas==2.2.3`
+has no prebuilt wheel and gets compiled from source, which is what makes a
+cold start look like it's hanging rather than just taking the normal
+minute or so. If a future restructure moves `app/requirements.txt` again,
+move `app/.python-version` along with it.
 
 ### Quarto usage
 
