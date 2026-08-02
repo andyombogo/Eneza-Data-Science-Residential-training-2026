@@ -39,8 +39,10 @@ own task.
 - Export only aggregate, non-identifying outputs to `data/processed/`.
 - Do not commit rendered Quarto HTML (`outputs/report/` is gitignored) —
   attach a rendered copy as a release asset or hosted link instead.
-- Keep runtime Python dependencies pinned in `requirements.txt`; the R/Quarto
-  environment is specified in `environment.yml`.
+- Keep runtime Python dependencies pinned in `app/requirements.txt`
+  (colocated with the Streamlit entrypoint so Streamlit Cloud's dependency
+  discovery finds it); the R/Quarto environment is specified in
+  `environment.yml`.
 
 ## Task 2 output contract
 

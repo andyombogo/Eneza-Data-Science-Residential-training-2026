@@ -17,7 +17,7 @@ KDHS_PATH ?= data/raw/KEKR8BFL.DTA
 all: wealth assets report
 
 deps:
-	pip install -r requirements.txt
+	pip install -r app/requirements.txt
 
 data:
 	KDHS_PATH=$(KDHS_PATH) Rscript scripts/clean_data.R

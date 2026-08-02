@@ -111,7 +111,8 @@ project7-maternal-child-health/
 │   │   ├── 2_Wealth_Analysis.py
 │   │   ├── 3_Intervention_Prioritization.py
 │   │   └── 4_Policy_Recommendations.py
-│   └── utils.py                  # shared data loaders -- one source of truth for file paths
+│   ├── utils.py                  # shared data loaders -- one source of truth for file paths
+│   └── requirements.txt          # colocated with Home.py -- Streamlit Cloud looks here, not the project root
 │
 ├── data/
 │   ├── raw/                      # gitignored -- restricted KDHS file + individual-level intermediates
@@ -146,7 +147,6 @@ project7-maternal-child-health/
 │
 ├── PLAN.md
 ├── README.md
-├── requirements.txt               # Python deps for the app (pandas, streamlit -- deliberately minimal)
 ├── environment.yml                # one-command conda env: Python + R + Quarto
 ├── Makefile                       # `make all` / `make report` / `make app`
 └── .gitignore
@@ -188,7 +188,7 @@ make report                  # quarto render quarto/ -> outputs/report/ (gitigno
 ### Streamlit usage
 
 ```bash
-pip install -r requirements.txt
+pip install -r app/requirements.txt
 streamlit run app/Home.py
 ```
 
@@ -197,8 +197,12 @@ No restricted data or R installation is needed to run the app itself.
 
 **Deploy (Streamlit Community Cloud):** point the deploy at this branch
 (`task2-4-submission`), main file path `project7-maternal-child-health/app/Home.py`.
-`.python-version` is pinned at the repository root (`3.12`) so Streamlit
-Cloud's `uv` build tool picks it up correctly.
+`app/requirements.txt` is colocated with the entrypoint so Cloud's build
+picks it up automatically. `.python-version` is pinned at the actual
+repository root (one level above `project7-maternal-child-health/` — see
+`.python-version` there) so Streamlit Cloud's `uv` build tool finds it;
+this is unrelated to `app/requirements.txt`'s location and doesn't need to
+move again.
 
 ### Quarto usage
 
