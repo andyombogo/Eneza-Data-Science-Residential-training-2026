@@ -143,10 +143,11 @@ reads these files from `data/processed/`:
 | `task2_stunting_by_county.csv` | Available | `county`, `prevalence_pct`, `ci_lower`, `ci_upper` |
 | `outputs/figures/task2_haz_histogram.png` | Available | national HAZ histogram image |
 | `task2_wealth_concentration_indices.json` | **Recovered (preliminary)** | stunting/immunisation/SBA concentration indices — see Recovered analysis above |
-| `outputs/maps/county_stunting_map.png` | Pending | county choropleth — code ready in `scripts/regional_analysis.R`, not yet run |
+| `outputs/maps/county_stunting_map.png` | **Recovered (preliminary)** | county choropleth, 12–35mo band — `scripts/regional_analysis.R` will regenerate on the 6–59mo band once run against real data |
+| `outputs/maps/county_immunisation_map.png`, `county_sba_map.png` | **Recovered, not yet wired to a page** | same provenance as above; no Immunisation/SBA regional page exists in `app/pages/` yet |
 | `task2_immunisation_summary.json` | Pending in this branch's pipeline | full working code recovered (`Project7_task2.qmd`), not yet ported into `scripts/compute_indicators.R` or executed |
 | `task2_skilled_birth_attendance_summary.json` | Pending in this branch's pipeline | full working code recovered, not yet ported or executed |
-| `task2_wealth_quintile.csv` | Pending | `indicator`, `wealth_quintile`, `prevalence_pct`, `ci_lower`, `ci_upper` — code ready in `scripts/wealth_quintile_analysis.R`, **highest-priority remaining item not covered by the recovered work** |
+| `task2_wealth_quintile.csv` | **Genuinely missing** | `indicator`, `wealth_quintile`, `prevalence_pct`, `ci_lower`, `ci_upper` — confirmed absent from the recovered work too (`wealth_q = v190` is computed in `Project7_task2.qmd` but never used again); code ready in `scripts/wealth_quintile_analysis.R`, **highest-priority remaining item** |
 
 ## Task 4 output contract
 
@@ -162,9 +163,13 @@ reads these files from `data/processed/`:
 - [x] v1 intervention prioritization from stunting data (Task 4)
 - [x] Task 4 owners assigned — John Andrew, Kevinson Mwangi, Elphas Abok
 - [x] Wealth-equity concentration indices recovered and surfaced (preliminary; see caveats above)
+- [x] County stunting choropleth map recovered and wired into the Regional Analysis page (preliminary)
+- [x] Immunisation and SBA county maps recovered (`outputs/maps/`), staged for future pages
+- [x] Confirmed the wealth-quintile gap is real, not an oversight — checked both recovered `.qmd` files, `wealth_q = v190` is never used
 - [ ] Reconcile the 6–59 vs 12–35 month age-band discrepancy — **needs a team decision, not code**
 - [ ] Port recovered immunisation/SBA analysis into `scripts/compute_indicators.R` and run against real KDHS data
-- [ ] County choropleth map export
+- [ ] Regenerate the stunting map on the 6–59mo band (currently showing the recovered 12–35mo version)
+- [ ] Build Immunisation and SBA regional app pages (maps are ready, no page exists yet)
 - [ ] Discrete wealth-quintile CSV (`scripts/wealth_quintile_analysis.R`) — **highest-priority code gap**
 - [ ] Task 4 v2: fold immunisation/SBA/quintile data into prioritization once available
 - [ ] Ethics / Data Protection notes (`docs/ethics_data_protection.md` — drafted, needs team review)

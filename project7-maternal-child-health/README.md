@@ -233,8 +233,9 @@ contract. Summary:
 | Task 4 v1 (county prioritization from stunting) | ✅ Done |
 | Task 4 owners | ✅ Assigned — John Andrew, Kevinson Mwangi, Elphas Abok |
 | Wealth-equity concentration indices (stunting, immunisation, SBA) | 🟡 Recovered from a teammate's branch, preliminary — see PLAN.md § Recovered analysis |
-| County choropleth map export | 🟡 Code ready, not yet run |
-| Discrete wealth-quintile breakdown | 🟡 Code ready, not yet run — **highest-priority remaining code gap** |
+| County stunting choropleth map | 🟡 Recovered and live on the Regional Analysis page, preliminary (12–35mo band, pending regeneration on 6–59mo) |
+| Immunisation & SBA county maps | 🟡 Recovered (`outputs/maps/`), no app page built for them yet |
+| Discrete wealth-quintile breakdown | ❌ Confirmed genuinely missing (checked the recovered work too) — code ready, not yet run — **highest-priority remaining gap** |
 | Immunisation coverage (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
 | Skilled birth attendance (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
 | Age-band reconciliation (6–59mo vs. 12–35mo stunting definitions) | ⏳ Needs a team decision, not code — see PLAN.md |
