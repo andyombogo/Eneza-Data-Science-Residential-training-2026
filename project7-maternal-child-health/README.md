@@ -37,7 +37,7 @@ than leaving that judgment to intuition.
 | **National child stunting** | 17.4% (HAZ < -2 SD, WHO 2006 standards), survey-weighted, n = 11,715 (ages 6–59 months) |
 | **County range** | 9.0% (Murang'a) to 38.6% (Kilifi) — a 29.6-point spread a national average alone would hide |
 | **Priority counties (v1)** | 5 of 47 flagged at ≥ national + 1 SD: **Kilifi, West Pokot, Samburu, Meru, Bomet** |
-| **Wealth-quintile analysis** | Pending — code is written and ready (`scripts/wealth_quintile_analysis.R`), gated on restricted-data access. See Status. |
+| **Wealth equity (preliminary)** | SBA concentration index **+0.66** (wealthy-concentrated) — the largest of 3 indicators. Discrete quintile breakdown still pending. See Status. |
 | **Reproduce** | `make all` (see Reproducibility) |
 | **Live app** | `streamlit run app/Home.py` |
 
@@ -231,11 +231,14 @@ contract. Summary:
 |---|---|
 | National + county stunting | ✅ Done |
 | Task 4 v1 (county prioritization from stunting) | ✅ Done |
+| Task 4 owners | ✅ Assigned — John Andrew, Kevinson Mwangi, Elphas Abok |
+| Wealth-equity concentration indices (stunting, immunisation, SBA) | 🟡 Recovered from a teammate's branch, preliminary — see PLAN.md § Recovered analysis |
 | County choropleth map export | 🟡 Code ready, not yet run |
-| Wealth-quintile analysis (stunting, immunisation, SBA) | 🟡 Code ready, not yet run — **highest priority remaining item** |
-| Immunisation coverage | 🟡 Code ready, not yet run |
-| Skilled birth attendance | 🟡 Code ready, not yet run |
-| Task 4 v2 (fold in wealth/immunisation/SBA) | ⏳ Blocked on the above |
+| Discrete wealth-quintile breakdown | 🟡 Code ready, not yet run — **highest-priority remaining code gap** |
+| Immunisation coverage (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
+| Skilled birth attendance (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
+| Age-band reconciliation (6–59mo vs. 12–35mo stunting definitions) | ⏳ Needs a team decision, not code — see PLAN.md |
+| Task 4 v2 (fold in equity/immunisation/SBA) | ⏳ Blocked on the above |
 
 ## Key findings
 
@@ -250,22 +253,41 @@ contract. Summary:
   `data/processed/task4_priority_counties.csv`, `ci_width_pct`) — estimate
   certainty varies county to county and should weigh into resourcing
   decisions, not just the point estimate.
-- Wealth-quintile variation — the second axis this project is scoped to
-  quantify — is not yet analysed. Treat the county-only view above as a
-  first-pass, geography-only picture (see Status).
+- **Skilled birth attendance is the sharpest wealth-equity gap found so
+  far** (concentration index +0.66, 95% CI 0.62–0.70) — heavily
+  concentrated among wealthier households. Stunting (−0.25) and incomplete
+  immunisation (−0.16) both concentrate among poorer households, in the
+  same direction as each other but a smaller gap than SBA's. These are
+  preliminary, recovered findings — see Status and
+  [`data/processed/task2_wealth_concentration_indices.json`](data/processed/task2_wealth_concentration_indices.json)
+  for full provenance before citing them as final.
+- An independent county-level analysis (12–35 month age band) ranks
+  **Kilifi, West Pokot, and Samburu** as the top 3 highest-stunting
+  counties — the same top 3 as this branch's own 6–59-month analysis.
+  Corroboration across two different age-band choices, not a coincidence.
 
 ## Intervention recommendations
 
 1. **Prioritize Kilifi, West Pokot, Samburu, Meru, and Bomet** for the next
    round of nutrition programming, weighting resourcing by both the size of
    the gap vs. national prevalence and the certainty of each estimate.
-2. **Close the wealth-quintile gap before finalizing county-level
-   resourcing** — geography and wealth are correlated but not identical; a
-   county-only view can miss underserved households regardless of county.
-3. **Re-run the prioritization once immunisation and skilled-birth-
-   attendance data land.** A county that ranks moderately on stunting alone
-   but poorly across all three indicators is a stronger case than any
-   single indicator suggests.
+   Independent corroboration from a second, differently-scoped analysis
+   (see Key findings) strengthens the case for at least the top 3.
+2. **Treat skilled birth attendance as a wealth-access problem, not only a
+   geographic one.** Its concentration index (+0.66) is the largest
+   wealth-related gap found in this analysis — larger than stunting's or
+   immunisation's — so an SBA intervention aimed only at low-coverage
+   counties may miss the bigger driver: cost/access barriers correlated
+   with household wealth within a county, not just which county a mother
+   lives in.
+3. **Confirm the discrete wealth-quintile breakdown before finalizing
+   resourcing.** The concentration indices above establish *that* wealth
+   inequality exists and roughly how large it is; a quintile table is still
+   needed to say *which* quintiles specifically to target.
+4. **Re-run the prioritization once immunisation and skilled-birth-
+   attendance county-level data land.** A county that ranks moderately on
+   stunting alone but poorly across all three indicators is a stronger case
+   than any single indicator suggests.
 
 Full derivation and caveats: [`quarto/intervention_analysis.qmd`](quarto/intervention_analysis.qmd),
 [`docs/methodology.md`](docs/methodology.md).
@@ -285,7 +307,7 @@ Full derivation and caveats: [`quarto/intervention_analysis.qmd`](quarto/interve
 | Task | Owners |
 |---|---|
 | Task 2 — Regional & wealth-quintile indicators | Kevinson Mwangi, Elphas Abok |
-| Task 4 — Intervention targeting | **[assign — see PLAN.md]** |
+| Task 4 — Intervention targeting | John Andrew, Kevinson Mwangi, Elphas Abok |
 
 Per the brief's requirement, every member should be able to explain the
 whole submission, not only their own task.

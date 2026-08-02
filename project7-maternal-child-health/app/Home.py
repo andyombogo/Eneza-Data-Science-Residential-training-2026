@@ -80,7 +80,7 @@ tasks = pd.DataFrame(
         },
         {
             "Task": "Intervention prioritization (Task 4)",
-            "Owners": "[assign — see PLAN.md]",
+            "Owners": "John Andrew, Kevinson Mwangi, Elphas Abok",
             "Status": "🟢 v1 live: county ranking from stunting data. Refinement pending wealth/immunisation/SBA data.",
         },
     ]

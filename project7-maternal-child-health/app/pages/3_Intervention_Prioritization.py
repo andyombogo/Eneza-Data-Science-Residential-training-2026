@@ -21,7 +21,7 @@ flagged = priority[priority["priority"]]
 threshold = round(NATIONAL_STUNTING_PCT + priority["prevalence_pct"].std(ddof=1), 1)
 
 st.title("🎯 Intervention Prioritization")
-st.caption("Owners: [assign — see PLAN.md]")
+st.caption("Owners: John Andrew, Kevinson Mwangi, Elphas Abok")
 st.markdown(
     "Where should intervention go first? A county is flagged **priority** "
     "if its stunting prevalence sits at or above **national prevalence + 1 "

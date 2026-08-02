@@ -1,7 +1,7 @@
 ---
 title: "Task 4: Where to Target Interventions"
 subtitle: "County prioritization from Task 2's stunting evidence"
-author: "[assign an owner -- see PLAN.md]"
+author: "John Andrew, Kevinson Mwangi, Elphas Abok"
 date: today
 ---
 
