@@ -1,85 +1,79 @@
-# Project 7 — Maternal & Child Health Outcomes: Group Plan
+# Project 7 — Maternal & Child Health Outcomes: Submission Plan
 
-Mini-project development window (per training schedule): **July 27 – Aug 5, 2026**.
-Final presentation: **August 7, 2026**.
+**Branch:** `task2-4-submission` — the final ENEZA submission, scoped to
+**Task 2** (regional & wealth-quintile indicators) and **Task 4**
+(intervention targeting) only. Cut from `project7-setup` on 2026-08-02.
 
-## Tasks (from Project_7.md)
+Mini-project development window: **2026-07-27 – 2026-08-05**.
+Final presentation: **2026-08-07**.
+
+## Scope
 
 | # | Task | Owner | Status |
 |---|------|-------|--------|
-| 1 | Predict maternal risk level from clinical measurements (UCI Maternal Health Risk) | John Andrew & Jared Onsomu | Done |
-| 2 | Describe how Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region & wealth quintile (DHS/UNICEF) | Kevinson Mwangi & Elphas Abok | In progress — national stunting done (17.4%), county-level/immunisation/skilled birth attendance/wealth quintile still pending |
-| 3 | Audit the risk model for fairness across age groups & check calibration | John Andrew & Jared Onsomu | Done — on `task3-fairness-calibration` branch, pending review/merge |
-| 4 | Discuss where to target interventions | TBD | Not started |
+| 2 | Kenyan maternal/child indicators by region & wealth quintile (KDHS 2022) | Kevinson Mwangi, Elphas Abok | Stunting: national + county done. Immunisation, skilled birth attendance, wealth-quintile: pending. |
+| 4 | Where to target interventions | **[assign today — see below]** | v1 live: county prioritization from stunting data (`data/processed/task4_priority_counties.csv`). Refinement pending Task 2's remaining exports. |
 
-Every member should be able to explain the whole project, not just their own task.
+Every member should be able to explain the whole submission, not just their
+own task.
 
-## Workflow
+## Branch workflow
 
-- One feature branch per task (e.g. `task1-risk-classifier`), merged via PR.
-- Track task breakdown with GitHub issues.
-- Do not commit raw data — scripts fetch it on demand (`scripts/download_data.py`).
-- Pin dependencies in `requirements.txt`.
+- `task2-4-submission` is the integration branch for the final submission
+  and the branch Streamlit Cloud should deploy from once ready (see README
+  § Deploy).
+- `project7-setup` (the team's full 4-task training branch) is untouched by
+  this restructuring — nothing was deleted there, and it remains the
+  correct place for any work outside this submission's scope.
+- New work branches off the latest `task2-4-submission`, PR'd back in after
+  review — same pattern as the team's existing workflow, just against this
+  branch instead.
+- Keep task branches short-lived given the compressed timeline (dev window
+  ends 2026-08-05); a stale branch this close to submission costs more than
+  it saves.
 
-### Branch flow
+## Repository rules
 
-```
-upstream/main   (ENEZA-DSI/Eneza-Data-Science-Residential-training-2026 — the org repo)
-      ↓  fork
-your main       (andyombogo/Eneza-Data-Science-Residential-training-2026, branch: main)
-      ↓  branch
-project7-setup  (this project's integration branch — everyone's task branches merge here)
-      ↓  branch
-task branches   (e.g. task2-regional-indicators, one per task)
-      ↓  PR
-project7-setup  (merge task work back in)
-      ↓  PR (once the whole project is ready)
-upstream/main
-```
+- Do not commit raw KDHS/DHS microdata, or any individual-level derivative
+  of it, at any pipeline stage. `data/raw/` stays gitignored unconditionally.
+- Export only aggregate, non-identifying outputs to `data/processed/`.
+- Do not commit rendered Quarto HTML (`outputs/report/` is gitignored) —
+  attach a rendered copy as a release asset or hosted link instead.
+- Keep runtime Python dependencies pinned in `requirements.txt`; the R/Quarto
+  environment is specified in `environment.yml`.
 
-Confirmed state: `origin` = `andyombogo/Eneza-Data-Science-Residential-training-2026`
-(fork), `upstream` = `ENEZA-DSI/Eneza-Data-Science-Residential-training-2026`
-(org repo); `main` is in sync with `upstream/main` (no drift). `project7-setup`
-is the integration branch — the Streamlit app is deployed from it, so **don't
-rename it** without updating the Streamlit Cloud app's branch setting too. Note
-this repo's own naming is `project7-setup`, not `project-7` — same role, just
-that name; rename only if the team wants to, since it'd need a matching update
-on the live deploy.
+## Task 2 output contract
 
-`task2-regional-indicators` followed this correctly (branched off
-`project7-setup`) and has now been merged back in. `task3-fairness-calibration`
-follows it too (pushed, awaiting your review/merge). Task 1's work was
-committed directly to `project7-setup` rather than through its own task
-branch + PR — a gap versus the intended workflow above, left as-is since
-it's already merged, but the branch-per-task pattern is now the norm for
-Tasks 2 onward. Collaborators need push access to `origin` to work this way
-(see repo Settings → Collaborators) — otherwise they fork `origin`
-themselves and PR into `project7-setup`.
+The Streamlit app (`app/pages/1_Regional_Analysis.py`, `2_Wealth_Analysis.py`)
+reads these files from `data/processed/`:
 
-**Task 3 method note:** audits the Task 1 model using out-of-fold
-predictions across the full 1,014-row dataset (5-fold CV, same tuned
-config as production) rather than only the 203-row test set — the
-smallest age/class subgroup has as few as ~39 cases, too little for a
-trustworthy fairness comparison from the test set alone. See
-`src/task3_fairness_audit.py` (shared by the notebook and the Streamlit
-page) and `notebooks/task3_fairness_calibration_audit.ipynb` for the full
-derivation. Headline finding: a real (bootstrap-CI-supported) fairness gap
-— the model catches ~85% of true high-risk cases among mothers under 20,
-vs. ~96% for the 20–34 reference group.
+| File | Status | Required columns/content |
+|------|--------|--------------------------|
+| `task2_stunting_summary.json` | Available | source, methodology, sample counts, national stunting prevalence |
+| `task2_stunting_by_county.csv` | Available | `county`, `prevalence_pct`, `ci_lower`, `ci_upper` |
+| `outputs/figures/task2_haz_histogram.png` | Available | national HAZ histogram image |
+| `outputs/maps/county_stunting_map.png` | **Pending** | county choropleth — code ready in `scripts/regional_analysis.R`, not yet run |
+| `task2_immunisation_summary.json` | **Pending** | national prevalence (%), sample size — code skeleton in `scripts/compute_indicators.R` |
+| `task2_skilled_birth_attendance_summary.json` | **Pending** | national prevalence (%), sample size — code skeleton in `scripts/compute_indicators.R` |
+| `task2_wealth_quintile.csv` | **Pending** | `indicator`, `wealth_quintile`, `prevalence_pct`, `ci_lower`, `ci_upper` — code ready in `scripts/wealth_quintile_analysis.R`, **highest priority remaining item** |
 
-**Task 2 data note:** the KDHS 2022 microdata (`KEKR8BFL.DTA`) used for this
-analysis is restricted-access (DHS Program data request), unlike Task 1's
-openly downloadable UCI dataset — it isn't and can't be committed or
-fetched by a script. Only the aggregate, non-identifying results derived
-from it live in the repo (`project7-maternal-child-health/data/processed/`),
-consumed by the Task 2 Streamlit page. See
-`notebooks/task2_regional_indicators.qmd` for the R analysis source (needs
-R + the restricted data file to actually run) and that JSON file's own
-notes for exactly what's computed vs. still pending.
+## Task 4 output contract
+
+| File | Status | Required columns/content |
+|------|--------|--------------------------|
+| `task4_priority_counties.csv` | Available (v1) | `priority_rank`, `county`, `prevalence_pct`, `ci_lower`, `ci_upper`, `gap_vs_national_pct`, `ci_width_pct`, `priority` |
+| `task4_wealth_note.txt` | Available (placeholder note until wealth data lands) | One-line equity note, auto-generated by `scripts/intervention_prioritization.R` |
 
 ## Deliverables checklist
 
-- [x] Reproducible notebook (Task 1: `notebooks/task1_risk_classifier_eda.ipynb`; Task 3: `notebooks/task3_fairness_calibration_audit.ipynb`)
-- [ ] Disaggregated EDA (region / wealth quintile) — Task 2: national stunting done, county-level/wealth-quintile pending
-- [x] Predictive model (Task 1) / [x] subgroup equity & calibration audit (Task 3, pending merge)
-- [ ] Report with ethics / Data Protection notes + each member's role
+- [x] National stunting summary (Task 2)
+- [x] County stunting CSV + confidence intervals (Task 2)
+- [x] v1 intervention prioritization from stunting data (Task 4)
+- [ ] County choropleth map export
+- [ ] Wealth-quintile summaries for stunting, immunisation, SBA (Task 2) — **highest priority**
+- [ ] Immunisation coverage summary (Task 2)
+- [ ] Skilled birth attendance summary (Task 2)
+- [ ] Task 4 owner assigned
+- [ ] Task 4 v2: fold wealth/immunisation/SBA into prioritization once available
+- [ ] Ethics / Data Protection notes (`docs/ethics_data_protection.md` — drafted, needs team review)
+- [ ] Rendered Quarto report attached for submission (not committed as HTML)

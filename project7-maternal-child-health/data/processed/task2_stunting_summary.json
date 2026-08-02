@@ -2,8 +2,9 @@
   "source": "Kenya Demographic and Health Survey (KDHS) 2022, Kids' Recode (KR) file",
   "source_access": "restricted -- obtained via an approved data request to The DHS Program (dhsprogram.com); the raw microdata file is not redistributable and is not committed to this repository",
   "analysis_author": "Kevinson Mwangi, Elphas Abok",
-  "analysis_source_file": "notebooks/task2_regional_indicators.qmd",
-  "extracted_from": "rendered output committed at project7-setup merge commit 147a75d (see git history), read 2026-07-28",
+  "analysis_source_file": "quarto/regional_analysis.qmd",
+  "pipeline_script": "scripts/regional_analysis.R",
+  "extracted_from": "national summary extracted from rendered output committed at project7-setup merge commit 147a75d; county CSV cleaned from origin/task2-regional-indicators commit aa14b2e, read 2026-07-28; repository restructured to Task 2 + Task 4 only on 2026-08-02",
   "methodology": "Youngest living child per mother kept per household. Stunting defined as height-for-age z-score (HAZ) < -2 SD, WHO 2006 growth reference standards. Estimates are survey-weighted (v005) and account for the two-stage cluster sample design (primary sampling unit = v021, strata = v022).",
   "sample": {
     "total_children_all_ages": 13528,
@@ -16,12 +17,16 @@
     "stunting_prevalence_ci_note": "not computed in the source analysis (table statistic was n (%) only, no CI requested)"
   },
   "subnational": {
-    "status": "not available",
-    "note": "County-level prevalence with 95% CIs is written in notebooks/task2_regional_indicators.qmd (svyby + svyciprop by county, merged to a Kenya counties shapefile via rKenyaCensus) but the rendered output image was never committed to git, and the current HTML render predates this code being added. Re-running that chunk and exporting stunting_county (county, prevalence, lb, ub) to CSV would make this section real."
+    "status": "available",
+    "county_stunting_csv": "data/processed/task2_stunting_by_county.csv",
+    "county_map_png": "outputs/maps/county_stunting_map.png",
+    "county_map_status": "not yet generated -- run `make regional` (scripts/regional_analysis.R)",
+    "county_rows": 47,
+    "note": "County-level weighted stunting prevalence and 95% CIs are available as a cleaned 47-county CSV. The stale task2 branch wrote this output under Derived_data with geometry attached; this repo keeps only county, prevalence_pct, ci_lower, and ci_upper in data/processed/."
   },
   "not_yet_analysed": [
-    "skilled birth attendance",
-    "immunisation coverage (code present in the .qmd but incomplete/contains a syntax error -- the fully_vaccinated ifelse() is missing its TRUE/FALSE branches)",
-    "wealth quintile breakdown (no wealth-quintile variable used anywhere in the current analysis)"
+    "immunisation coverage summary/export",
+    "skilled birth attendance summary/export",
+    "wealth quintile breakdown for stunting, immunisation, and skilled birth attendance"
   ]
 }

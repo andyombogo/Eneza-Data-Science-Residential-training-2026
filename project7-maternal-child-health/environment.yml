@@ -1,0 +1,28 @@
+# One-command environment for the full pipeline (R analysis + Quarto + the
+# Streamlit app). Python-only contributors can skip this and use
+# requirements.txt directly -- this file exists for anyone running `make all`
+# end-to-end, including the R/Quarto stages.
+#
+#   conda env create -f environment.yml
+#   conda activate project7-maternal-health
+#   Rscript -e 'remotes::install_github("Shelmith-Kariuki/rKenyaCensus")'  # not on conda-forge
+#
+name: project7-maternal-health
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pandas=2.2.*
+  - streamlit=1.47.*
+  - r-base=4.3.*
+  - r-pacman
+  - r-tidyverse
+  - r-haven
+  - r-labelled
+  - r-survey
+  - r-gtsummary
+  - r-gt
+  - r-sf
+  - r-jsonlite
+  - r-remotes
+  - quarto

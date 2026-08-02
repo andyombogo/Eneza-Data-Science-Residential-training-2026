@@ -1,0 +1,88 @@
+---
+title: "Task 4: Where to Target Interventions"
+subtitle: "County prioritization from Task 2's stunting evidence"
+author: "[assign an owner -- see PLAN.md]"
+date: today
+---
+
+<!--
+Reads only ../data/processed/task2_stunting_by_county.csv and
+task4_priority_counties.csv (scripts/intervention_prioritization.R,
+`make intervention`) -- both aggregate, non-restricted. No KDHS microdata
+access is required to render this report.
+-->
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| include: false
+
+pacman::p_load(tidyverse, gt)
+priority <- read_csv("../data/processed/task4_priority_counties.csv", show_col_types = FALSE)
+national_pct <- 17.4  # data/processed/task2_stunting_summary.json -> national.stunting_prevalence_weighted_pct
+threshold <- round(national_pct + sd(priority$prevalence_pct), 1)
+flagged <- priority |> filter(priority)
+```
+
+## Prioritization rule
+
+A county is flagged for priority intervention if its survey-weighted
+stunting prevalence is at or above **national prevalence + 1 standard
+deviation across counties** (`r national_pct`% + `r round(sd(priority$prevalence_pct), 1)`
+pts = **`r threshold`%**) — meaningfully worse than typical variation, not
+merely above the national average. This is a v1 rule deliberately built on
+Task 2's most complete indicator (stunting, all 47 counties) rather than
+waiting on wealth-quintile/immunisation/SBA data to land; see
+`quarto/wealth_analysis.qmd` for how those axes will refine this ranking
+once available.
+
+## Flagged counties
+
+```{r}
+#| label: tbl-priority
+#| echo: false
+flagged |>
+  select(priority_rank, county, prevalence_pct, ci_lower, ci_upper, gap_vs_national_pct) |>
+  gt() |>
+  cols_label(
+    priority_rank = "Rank", county = "County", prevalence_pct = "Prevalence (%)",
+    ci_lower = "95% CI lower", ci_upper = "95% CI upper", gap_vs_national_pct = "vs. national (pts)"
+  ) |>
+  tab_header(title = sprintf("%d counties at or above %.1f%% stunting prevalence", nrow(flagged), threshold))
+```
+
+```{r}
+#| label: fig-priority
+#| echo: false
+#| fig-cap: "All 47 counties, ranked; flagged counties shaded."
+priority |>
+  ggplot(aes(x = fct_reorder(county, prevalence_pct), y = prevalence_pct, fill = priority)) +
+  geom_col() +
+  geom_hline(yintercept = national_pct, linetype = "dashed", color = "grey40") +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#B23A48", "FALSE" = "grey70"), guide = "none") +
+  labs(x = NULL, y = "Stunting prevalence (%)") +
+  theme_bw(base_size = 10)
+```
+
+## Reading the confidence intervals before acting
+
+Some flagged counties (see `ci_width_pct` in the underlying CSV) have wide
+confidence intervals — a signal that the estimate rests on fewer sampled
+clusters. Two counties with the same point estimate are not equally strong
+cases for intervention if one has a CI half the width of the other. Any
+resourcing decision should weight this alongside the point estimate, not
+read the ranking as if every row carries equal certainty.
+
+## What would sharpen this ranking further
+
+- Fold in `quarto/wealth_analysis.qmd`'s poorest-quintile gap once computed
+  — a county that is both high-stunting and has a wide internal wealth gap
+  is a stronger case than stunting alone suggests.
+- Add immunisation and skilled-birth-attendance prevalence per county, once
+  available, as corroborating (or contradicting) evidence — a county could
+  rank moderately on stunting alone but poorly across all three indicators.
+- `data/external/` is reserved for supporting context (e.g. facility density
+  or distance-to-care layers) that isn't in KDHS itself, if pursued as a
+  stretch goal.

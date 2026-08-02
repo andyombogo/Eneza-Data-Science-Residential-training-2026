@@ -1,0 +1,82 @@
+---
+title: "Task 2: Wealth Analysis — Indicator Gaps by Wealth Quintile"
+subtitle: "Stunting, immunisation, and skilled birth attendance across Kenya's DHS wealth index"
+author: "Kevinson Mwangi & Elphas Abok"
+date: today
+---
+
+<!--
+Reads ../data/processed/task2_wealth_quintile.csv, produced by
+scripts/wealth_quintile_analysis.R (make wealth). That script is written
+and ready but has not yet been run against the real KDHS file -- this
+report renders a clear "pending" state until it has, rather than failing
+or (worse) showing fabricated numbers.
+-->
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| include: false
+
+pacman::p_load(tidyverse, gt)
+wealth_path <- "../data/processed/task2_wealth_quintile.csv"
+has_data <- file.exists(wealth_path)
+if (has_data) wealth <- read_csv(wealth_path, show_col_types = FALSE)
+```
+
+## Status
+
+```{r}
+#| echo: false
+#| results: asis
+if (!has_data) {
+  cat(
+    "**Not yet generated.** Run `make wealth` ",
+    "(`scripts/wealth_quintile_analysis.R`) against the real KDHS file to ",
+    "produce `data/processed/task2_wealth_quintile.csv`. The analysis code ",
+    "is complete and reuses the same survey design object as ",
+    "`regional_analysis.R` -- see that script for the design setup -- it ",
+    "has not been executed yet. Owners: Kevinson Mwangi, Elphas Abok."
+  )
+}
+```
+
+This is the highest-priority remaining gap in the project: Task 2 is defined
+as indicators varying by **region and wealth quintile**, and the wealth axis
+currently has no coverage anywhere in the repository. Closing this gap
+matters more for the project's completeness than any further regional
+breakdown, since region alone only answers half of what Task 2 asks.
+
+## Wealth-quintile estimates
+
+```{r}
+#| label: fig-wealth
+#| echo: false
+#| eval: !expr has_data
+wealth |>
+  mutate(wealth_quintile = factor(wealth_quintile, levels = c("Poorest", "Poorer", "Middle", "Richer", "Richest"))) |>
+  ggplot(aes(x = wealth_quintile, y = prevalence_pct, color = indicator, group = indicator)) +
+  geom_line() + geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper)) +
+  labs(x = NULL, y = "Prevalence (%)", color = "Indicator") +
+  theme_bw(base_size = 13)
+```
+
+```{r}
+#| label: tbl-wealth
+#| echo: false
+#| eval: !expr has_data
+wealth |>
+  gt(groupname_col = "indicator") |>
+  cols_label(wealth_quintile = "Wealth quintile", prevalence_pct = "Prevalence (%)",
+             ci_lower = "95% CI lower", ci_upper = "95% CI upper")
+```
+
+## Why this matters for Task 4
+
+A poorest-vs-richest quintile gap, once computed, is a national-level equity
+signal that complements the county-level geography in
+`quarto/regional_analysis.qmd` — a county can look average on stunting while
+still masking a sharp within-county wealth gap. `scripts/intervention_prioritization.R`
+already checks for this file and folds a one-line wealth-gap note into the
+Task 4 output if present.

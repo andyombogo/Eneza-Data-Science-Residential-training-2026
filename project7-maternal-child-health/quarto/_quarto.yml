@@ -1,0 +1,18 @@
+project:
+  type: default
+  output-dir: ../outputs/report
+
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 3
+    fig-width: 7
+    fig-height: 4.5
+    embed-resources: true   # single self-contained HTML per report -- no _files/ sidecar dirs to gitignore or lose
+
+execute:
+  freeze: auto   # re-render only when a .qmd or its inputs change
+  cache: false
+
+author-meta: "Project 7 -- Maternal & Child Health Outcomes"

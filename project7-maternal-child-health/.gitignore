@@ -1,5 +1,18 @@
+# Restricted KDHS microdata and individual-level intermediates -- never committed,
+# aggregate or not, at any pipeline stage.
 data/raw/
-models/
+data/external/*
+!data/external/.gitkeep
+
 __pycache__/
 *.pyc
 .venv/
+
+# Local R/Quarto build state -- rendered reports go to outputs/report/, not committed
+# (attach as a release asset or hosted link instead; see README > Reproducibility).
+.Rhistory
+.RData
+.Rproj.user/
+.quarto/
+outputs/report/*
+!outputs/report/.gitkeep
