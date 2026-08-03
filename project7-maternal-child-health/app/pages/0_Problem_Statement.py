@@ -66,7 +66,8 @@ TASK2_DELIVERABLES = [
     ("Stunting map regenerated on the 6–59mo band", False),
     ("Immunisation & SBA regional app pages built", False),
     ("Discrete wealth-quintile CSV (5-quintile breakdown per indicator)", False),
-    ("Small-area estimation (INLA) — stretch goal", False),
+    ("Adjusted ORs by wealth status (stunting/immunisation/SBA) — source pulled 2026-08-03, not yet run", False),
+    ("Small-area estimation (INLA + MBG, now prepped for all 3 indicators) — stretch goal", False),
 ]
 
 TASK4_DELIVERABLES = [

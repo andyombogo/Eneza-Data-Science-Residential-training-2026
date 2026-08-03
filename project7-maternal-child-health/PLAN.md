@@ -90,6 +90,44 @@ started. Requires the `INLA` R package (not on CRAN, install via
 and is a **stretch goal for after the core deliverables**, not a Aug 5
 priority — flagging its existence so it isn't lost, not scheduling it.
 
+## Pulled analysis (2026-08-03)
+
+`origin/task2-regional-indicators` picked up 17 more commits since the
+2026-08-02 recovery above, and this time the branch tip is healthy — no
+broken-commit workaround needed, `git cherry-pick` applied 16 of them
+cleanly (one `modify/delete` conflict on `Project7_task2.qmd`, resolved by
+keeping the incoming version, since our branch had retired that path in
+favor of `quarto/regional_analysis.qmd`). Pulled straight onto
+`task2-4-submission`.
+
+What's new relative to the 2026-08-02 recovery:
+
+- **Adjusted ORs added to all three concentration-curve plots** (stunting,
+  immunisation, SBA) in `Project7_task2.qmd`, alongside the existing
+  concentration index. Source-only — the ORs are read from
+  `Data/Derived_estimates/dhs_*_WI_adjusted_OR.csv`, which isn't in this
+  repo (matches the "no individual-level DHS derivatives committed" rule),
+  so there's no new number to extract yet. Same caveat as the 2026-08-02
+  concentration indices: don't treat as computed until it's actually run.
+- **MBG (model-based geostatistics) prep steps**, one file per indicator:
+  `Project7_task2_2_mbg_stunting.qmd`, `Project7_task2_2_mbg_immunisation.qmd`,
+  `Project7_task2_2_mbg_sba.qmd`. A second small-area-estimation approach
+  alongside INLA — prep/setup code only, not executed.
+- **INLA prep now split per indicator** (previously one combined
+  `Project7_task2_inla.qmd` covering stunting only): `Project7_task2_inla_stunting.qmd`,
+  `Project7_task2_inla_immunisation.qmd`, `Project7_task2_inla_sba.qmd`. So
+  the small-area-estimation stretch goal now has prep code for all three
+  Task 2 indicators, not just stunting — still not run, still requires the
+  `INLA` package and the restricted-access microdata neither of which are
+  available in this environment.
+- Axis-label fixes and the 12–35 month restriction reaffirmed in
+  `Project7_task2.qmd` — cosmetic/consistency, no new findings.
+
+None of this changes `data/processed/task2_wealth_concentration_indices.json`
+or any other file the Streamlit app reads — it's source code recovered into
+the branch, not executed output. Treat the INLA/MBG checklist line below as
+"broader prep, still not run," not "done."
+
 **Still genuinely missing** (the recovered `.qmd` doesn't cover this): a
 literal 5-quintile breakdown per indicator (`task2_wealth_quintile.csv`,
 contract below) — the recovered work answers "does this vary by wealth"
@@ -174,4 +212,5 @@ reads these files from `data/processed/`:
 - [ ] Task 4 v2: fold immunisation/SBA/quintile data into prioritization once available
 - [ ] Ethics / Data Protection notes (`docs/ethics_data_protection.md` — drafted, needs team review)
 - [ ] Rendered Quarto report attached for submission (not committed as HTML)
-- [ ] Stretch goal, not blocking: integrate the recovered INLA small-area estimation model
+- [ ] Stretch goal, not blocking: integrate the recovered small-area estimation prep (INLA + MBG, now prepped for stunting/immunisation/SBA — see Pulled analysis, 2026-08-03)
+- [ ] Adjusted ORs by wealth status (stunting/immunisation/SBA) — source added to `Project7_task2.qmd`, needs `Data/Derived_estimates/dhs_*_WI_adjusted_OR.csv` to actually run
