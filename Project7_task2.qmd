@@ -842,6 +842,11 @@ df_sba <- df |>
     sba = if_else(m3a == 1 | m3b == 1, "sba", "non sba"),
     sba_num = if_else(m3a == 1 | m3b == 1, 1, 0)) 
 
+
+# Saving a copy of the data for later MBG analysis
+write_dta(
+    df_sba, 
+    "./Data/Derived_data/df_sba.dta")
 ```
 
 Survey setting step
