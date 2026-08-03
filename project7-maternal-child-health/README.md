@@ -107,11 +107,16 @@ project7-maternal-child-health/
 ├── app/                          # Streamlit presentation layer
 │   ├── Home.py                   # landing page: headline metrics, task status
 │   ├── pages/
-│   │   ├── 0_Problem_Statement.py    # problem statement, objectives, Task 2/4 deliverables status
-│   │   ├── 1_Regional_Analysis.py
-│   │   ├── 2_Wealth_Analysis.py
-│   │   ├── 3_Intervention_Prioritization.py
-│   │   └── 4_Policy_Recommendations.py
+│   │   ├── 0_Problem_Statement.py       # problem statement, objectives, Task 2/4 deliverables status
+│   │   ├── 1_Data.py                    # sources, access terms, live data-completeness check
+│   │   ├── 2_Methodology.py             # docs/methodology.md in-app + INLA/MBG methodology summary
+│   │   ├── 3_Regional_Analysis.py
+│   │   ├── 4_Wealth_Analysis.py
+│   │   ├── 5_Spatial_Bayesian_Analysis.py  # INLA/MBG code audit -- status, not fabricated results
+│   │   ├── 6_Intervention_Prioritization.py
+│   │   ├── 7_Policy_Recommendations.py
+│   │   ├── 8_Downloads.py               # every committed output file, downloadable
+│   │   └── 9_About.py
 │   ├── utils.py                  # shared data loaders -- one source of truth for file paths
 │   └── requirements.txt          # colocated with Home.py -- Streamlit Cloud looks here, not the project root
 │
@@ -226,7 +231,9 @@ KDHS access yourself if someone else already ran the R pipeline.
 ## Status
 
 See [`PLAN.md`](PLAN.md) for the full deliverables checklist and output
-contract. Summary:
+contract, and [`docs/task2_audit_report.md`](docs/task2_audit_report.md)
+for a full requirement-by-requirement audit against the deployed app's
+Problem Statement page. Summary:
 
 | Item | Status |
 |---|---|
@@ -235,7 +242,7 @@ contract. Summary:
 | Task 4 owners | ✅ Assigned — John Andrew, Kevinson Mwangi, Elphas Abok |
 | Wealth-equity concentration indices (stunting, immunisation, SBA) | 🟡 Recovered from a teammate's branch, preliminary — see PLAN.md § Recovered analysis |
 | County stunting choropleth map | 🟡 Recovered and live on the Regional Analysis page, preliminary (12–35mo band, pending regeneration on 6–59mo) |
-| Immunisation & SBA county maps | 🟡 Recovered (`outputs/maps/`), no app page built for them yet |
+| Immunisation & SBA county maps | 🟡 Recovered (`outputs/maps/`), surfaced on the Spatial & Bayesian Analysis app page |
 | Discrete wealth-quintile breakdown | ❌ Confirmed genuinely missing (checked the recovered work too) — code ready, not yet run — **highest-priority remaining gap** |
 | Immunisation coverage (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
 | Skilled birth attendance (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |

@@ -11,7 +11,7 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import get_county_stunting, get_priority_counties, get_regional_summary
+from utils import get_county_stunting, get_priority_counties, get_regional_summary, page_footer
 
 st.set_page_config(
     page_title="Project 7 — Maternal & Child Health in Kenya",
@@ -57,10 +57,16 @@ st.divider()
 st.subheader("What's here")
 
 nav = [
+    ("📋 Problem Statement", "Objectives and a live Task 2/4 deliverables checklist."),
+    ("🗂️ Data", "Sources, access terms, and a live data-completeness check."),
+    ("🧪 Methodology", "Survey design, indicator definitions, and the INLA/MBG small-area methods."),
     ("📍 Regional Analysis", "How stunting varies across Kenya's 47 counties, with confidence intervals."),
-    ("💰 Wealth Analysis", "How outcomes vary by household wealth quintile."),
+    ("💰 Wealth Analysis", "How outcomes vary by household wealth — concentration indices and a forest plot."),
+    ("🌐 Spatial & Bayesian Analysis", "Code audit of the INLA/MBG small-area models: what exists, what's missing to run it."),
     ("🎯 Intervention Prioritization", "A ranked, threshold-based list of counties for intervention."),
     ("📋 Policy Recommendations", "What the evidence supports acting on, and what it doesn't yet."),
+    ("⬇️ Downloads", "Every committed output file, downloadable, with its completeness status."),
+    ("ℹ️ About", "Team, tech stack, and links."),
 ]
 for label, desc in nav:
     st.markdown(f"**{label}** — {desc}")
@@ -94,3 +100,5 @@ st.markdown(
     "Kids' Recode file — restricted-access, obtained via an approved DHS Program data request.\n"
     "- **[rKenyaCensus](https://github.com/Shelmith-Kariuki/rKenyaCensus)** — county boundary shapefiles for mapping."
 )
+
+page_footer("Home")

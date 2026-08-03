@@ -9,10 +9,11 @@ wealth-quintile/immunisation/SBA landing first.
 import sys
 from pathlib import Path
 
+import plotly.express as px
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils import NATIONAL_STUNTING_PCT, get_priority_counties, get_wealth_note
+from utils import NATIONAL_STUNTING_PCT, PRIORITY_COUNTIES, get_file_bytes, get_priority_counties, get_wealth_note, page_footer
 
 st.set_page_config(page_title="Intervention Prioritization — Project 7", page_icon="🎯", layout="wide")
 
@@ -37,11 +38,26 @@ m3.metric("Top priority county", flagged.iloc[0]["county"], f"{flagged.iloc[0]['
 st.divider()
 st.subheader("All 47 counties, ranked")
 
-chart_df = priority.set_index("county")[["prevalence_pct"]].sort_values("prevalence_pct")
-st.bar_chart(chart_df, horizontal=True, use_container_width=True)
+chart_df = priority.sort_values("prevalence_pct").copy()
+chart_df["Priority status"] = chart_df["priority"].map({True: "Flagged priority", False: "Not flagged"})
+fig = px.bar(
+    chart_df,
+    x="prevalence_pct",
+    y="county",
+    orientation="h",
+    color="Priority status",
+    color_discrete_map={"Flagged priority": "#B84C4C", "Not flagged": "#3B6FA0"},  # colorblind-distinguishable, differ in lightness too
+    labels={"prevalence_pct": "Prevalence (%)", "county": "County"},
+    height=900,
+)
+fig.add_vline(x=NATIONAL_STUNTING_PCT, line_dash="dash", line_color="black", annotation_text="National")
+fig.add_vline(x=threshold, line_dash="dot", line_color="#B84C4C", annotation_text="Threshold")
+fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor="white", legend_title=None)
+st.plotly_chart(fig, use_container_width=True)
 st.caption(
-    f"Dashed reference: national prevalence {NATIONAL_STUNTING_PCT}%. "
-    "Bars are not color-split by flag status in this chart type — see the flagged table below for exactly which counties cross the threshold."
+    f"Dashed line: national prevalence ({NATIONAL_STUNTING_PCT}%). Dotted line: "
+    f"priority threshold ({threshold:.1f}%). Bars are color-split by flag status — "
+    "red bars are the counties in the flagged table below."
 )
 
 st.divider()
@@ -55,6 +71,15 @@ st.dataframe(
     }),
     hide_index=True, use_container_width=True,
 )
+
+priority_bytes = get_file_bytes(PRIORITY_COUNTIES)
+if priority_bytes:
+    st.download_button(
+        "⬇️ Download full ranked county CSV",
+        data=priority_bytes,
+        file_name="task4_priority_counties.csv",
+        mime="text/csv",
+    )
 
 st.info(
     "**Read the CI width alongside the ranking.** A county with a wide "
@@ -84,3 +109,5 @@ with st.expander("Methodology & what would sharpen this ranking"):
         "Full derivation: `quarto/intervention_analysis.qmd`. "
         "Pipeline: `scripts/intervention_prioritization.R` (`make intervention`)."
     )
+
+page_footer("Intervention Prioritization")

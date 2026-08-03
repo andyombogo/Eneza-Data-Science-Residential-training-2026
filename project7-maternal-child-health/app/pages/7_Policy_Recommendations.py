@@ -11,7 +11,7 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils import get_county_stunting, get_priority_counties, get_regional_summary, has_wealth_quintile_data
+from utils import get_county_stunting, get_priority_counties, get_regional_summary, has_wealth_quintile_data, page_footer
 
 st.set_page_config(page_title="Policy Recommendations — Project 7", page_icon="📋", layout="wide")
 
@@ -90,3 +90,5 @@ st.markdown(
     "the only valid one — see `quarto/intervention_analysis.qmd` for the "
     "full derivation and how sensitive the flagged list is to that choice."
 )
+
+page_footer("Policy Recommendations")

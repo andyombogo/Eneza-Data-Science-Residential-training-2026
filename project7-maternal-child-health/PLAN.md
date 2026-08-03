@@ -172,7 +172,7 @@ data by anyone yet.
 
 ## Task 2 output contract
 
-The Streamlit app (`app/pages/1_Regional_Analysis.py`, `2_Wealth_Analysis.py`)
+The Streamlit app (`app/pages/3_Regional_Analysis.py`, `4_Wealth_Analysis.py`)
 reads these files from `data/processed/`:
 
 | File | Status | Required columns/content |
@@ -182,7 +182,7 @@ reads these files from `data/processed/`:
 | `outputs/figures/task2_haz_histogram.png` | Available | national HAZ histogram image |
 | `task2_wealth_concentration_indices.json` | **Recovered (preliminary)** | stunting/immunisation/SBA concentration indices — see Recovered analysis above |
 | `outputs/maps/county_stunting_map.png` | **Recovered (preliminary)** | county choropleth, 12–35mo band — `scripts/regional_analysis.R` will regenerate on the 6–59mo band once run against real data |
-| `outputs/maps/county_immunisation_map.png`, `county_sba_map.png` | **Recovered, not yet wired to a page** | same provenance as above; no Immunisation/SBA regional page exists in `app/pages/` yet |
+| `outputs/maps/county_immunisation_map.png`, `county_sba_map.png` | **Recovered, now on `5_Spatial_Bayesian_Analysis.py`** | same provenance as above |
 | `task2_immunisation_summary.json` | Pending in this branch's pipeline | full working code recovered (`Project7_task2.qmd`), not yet ported into `scripts/compute_indicators.R` or executed |
 | `task2_skilled_birth_attendance_summary.json` | Pending in this branch's pipeline | full working code recovered, not yet ported or executed |
 | `task2_wealth_quintile.csv` | **Genuinely missing** | `indicator`, `wealth_quintile`, `prevalence_pct`, `ci_lower`, `ci_upper` — confirmed absent from the recovered work too (`wealth_q = v190` is computed in `Project7_task2.qmd` but never used again); code ready in `scripts/wealth_quintile_analysis.R`, **highest-priority remaining item** |
@@ -204,13 +204,52 @@ reads these files from `data/processed/`:
 - [x] County stunting choropleth map recovered and wired into the Regional Analysis page (preliminary)
 - [x] Immunisation and SBA county maps recovered (`outputs/maps/`), staged for future pages
 - [x] Confirmed the wealth-quintile gap is real, not an oversight — checked both recovered `.qmd` files, `wealth_q = v190` is never used
+- [x] Full Task 2 audit against the deployed Problem Statement page — `docs/task2_audit_report.md` (2026-08-03)
+- [x] App restructured for production-quality navigation, robustness, and interactivity — see § App audit & restructure (2026-08-03) below
 - [ ] Reconcile the 6–59 vs 12–35 month age-band discrepancy — **needs a team decision, not code**
 - [ ] Port recovered immunisation/SBA analysis into `scripts/compute_indicators.R` and run against real KDHS data
 - [ ] Regenerate the stunting map on the 6–59mo band (currently showing the recovered 12–35mo version)
-- [ ] Build Immunisation and SBA regional app pages (maps are ready, no page exists yet)
+- [ ] Build Immunisation and SBA regional app pages with real county-level numbers (recovered maps are surfaced on the Spatial & Bayesian Analysis page in the meantime; no county-level immunisation/SBA number exists anywhere to build a full regional page around yet)
 - [ ] Discrete wealth-quintile CSV (`scripts/wealth_quintile_analysis.R`) — **highest-priority code gap**
 - [ ] Task 4 v2: fold immunisation/SBA/quintile data into prioritization once available
 - [ ] Ethics / Data Protection notes (`docs/ethics_data_protection.md` — drafted, needs team review)
 - [ ] Rendered Quarto report attached for submission (not committed as HTML)
+
+## App audit & restructure (2026-08-03)
+
+Full audit in `docs/task2_audit_report.md` — gap analysis of every Task 2
+requirement on the deployed Problem Statement page against
+`Project7_task2.qmd` and the INLA/MBG source. Headline: every requirement
+implementable without fabricating a result has been implemented; every
+requirement blocked by the raw-KDHS-microdata restriction (or the missing
+`INLA` R environment) is named explicitly, with the exact file/package
+needed, rather than skipped or faked.
+
+**App changes:**
+- Navigation restructured to 11 pages: Home, Problem Statement, Data,
+  Methodology, Regional Analysis, Wealth Analysis, Spatial & Bayesian
+  Analysis, Intervention Prioritization, Policy Recommendations, Downloads,
+  About. Existing page slugs unchanged (only the sidebar order-number
+  prefix moved), so no existing URL breaks.
+- New Data page: live file-existence completeness check, not a static claim.
+- New Methodology page: `docs/methodology.md` rendered in-app, plus an
+  honest INLA/MBG methodology summary with exact missing prerequisites.
+- New Spatial & Bayesian Analysis page: code inventory of all 6 INLA/MBG
+  files, what each would produce if run, and precisely what's blocking it.
+- Interactive Plotly additions using only already-real numbers: hoverable
+  county bar chart (Regional Analysis), a genuine forest plot for the three
+  concentration indices (Wealth Analysis), and a priority-flag-colored bar
+  chart (Intervention Prioritization, fixing a limitation that page's own
+  caption used to admit).
+- Downloads page + inline download buttons for every committed
+  `data/processed/*` file.
+- `utils.py`: all loaders now catch missing/malformed files and show a
+  clear `st.error` with the exact remediation command instead of an
+  uncaught traceback; added `data_inventory()` as the single source of
+  truth for the Data and Downloads pages.
+- Not attempted: an interactive county choropleth (no vetted GeoJSON
+  boundary file exists in this repo — see the audit report § 4) and any
+  INLA/MBG numeric output (needs R + `INLA` + restricted data, none
+  available in this environment).
 - [ ] Stretch goal, not blocking: integrate the recovered small-area estimation prep (INLA + MBG, now prepped for stunting/immunisation/SBA — see Pulled analysis, 2026-08-03)
 - [ ] Adjusted ORs by wealth status (stunting/immunisation/SBA) — source added to `Project7_task2.qmd`, needs `Data/Derived_estimates/dhs_*_WI_adjusted_OR.csv` to actually run

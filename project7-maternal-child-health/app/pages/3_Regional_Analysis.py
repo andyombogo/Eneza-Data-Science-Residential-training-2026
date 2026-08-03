@@ -4,10 +4,19 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils import COUNTY_MAP, HAZ_HISTOGRAM, get_county_stunting, get_regional_summary
+from utils import (
+    COUNTY_MAP,
+    COUNTY_STUNTING,
+    HAZ_HISTOGRAM,
+    get_county_stunting,
+    get_file_bytes,
+    get_regional_summary,
+    page_footer,
+)
 
 st.set_page_config(page_title="Regional Analysis — Project 7", page_icon="📍", layout="wide")
 
@@ -93,7 +102,7 @@ c2.metric("Highest county", highest["county"], f"{highest['prevalence_pct']:.1f}
 c3.metric("Lowest county", lowest["county"], f"{lowest['prevalence_pct']:.1f}%",
           help="Survey-weighted prevalence; 95% CI in the table below.")
 
-tab_map, tab_bar = st.tabs(["Map", "Ranked bar chart"])
+tab_map, tab_interactive, tab_bar = st.tabs(["Map", "Interactive chart", "Ranked bar chart"])
 with tab_map:
     if COUNTY_MAP.exists():
         st.image(str(COUNTY_MAP), caption="Weighted stunting prevalence by county.", use_container_width=True)
@@ -110,6 +119,43 @@ with tab_map:
             "which joins county estimates to rKenyaCensus shapefiles.",
             icon="⏳",
         )
+    st.caption(
+        "An interactive county *choropleth* (as opposed to this static image) needs "
+        "county boundary geometry in GeoJSON form — not available in this repo yet "
+        "(the R map above is built from `rKenyaCensus`, an R-only `.rda` object). "
+        "See `docs/task2_audit_report.md` § 4 for what's needed."
+    )
+with tab_interactive:
+    county_sorted = county.sort_values("prevalence_pct")
+    fig = px.bar(
+        county_sorted,
+        x="prevalence_pct",
+        y="county",
+        orientation="h",
+        error_x=county_sorted["ci_upper"] - county_sorted["prevalence_pct"],
+        error_x_minus=county_sorted["prevalence_pct"] - county_sorted["ci_lower"],
+        color="prevalence_pct",
+        color_continuous_scale="Viridis",  # colorblind-safe
+        labels={"prevalence_pct": "Prevalence (%)", "county": "County"},
+        height=900,
+    )
+    fig.add_vline(
+        x=summary["national"]["stunting_prevalence_weighted_pct"],
+        line_dash="dash",
+        line_color="#813134",
+        annotation_text="National",
+    )
+    fig.update_layout(
+        coloraxis_showscale=False,
+        margin=dict(l=10, r=10, t=10, b=10),
+        plot_bgcolor="white",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        "Hover a bar for the exact prevalence and 95% CI. Dashed line: national "
+        "weighted prevalence. Viridis palette — readable under the common forms "
+        "of color-vision deficiency."
+    )
 with tab_bar:
     st.bar_chart(county.set_index("county")[["prevalence_pct"]], horizontal=True, use_container_width=True)
 
@@ -121,9 +167,19 @@ with st.expander("County table with 95% confidence intervals"):
         }),
         hide_index=True, use_container_width=True,
     )
+    county_bytes = get_file_bytes(COUNTY_STUNTING)
+    if county_bytes:
+        st.download_button(
+            "⬇️ Download county stunting CSV",
+            data=county_bytes,
+            file_name="task2_stunting_by_county.csv",
+            mime="text/csv",
+        )
 
 st.divider()
 st.subheader("Remaining Task 2 work")
 for item in summary.get("not_yet_analysed", []):
     st.markdown(f"- {item}")
 st.caption("Tracked in `PLAN.md`. See the Wealth Analysis page for the wealth-quintile axis specifically.")
+
+page_footer("Regional Analysis")

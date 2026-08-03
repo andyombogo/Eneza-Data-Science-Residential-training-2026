@@ -93,9 +93,11 @@ branch's committed stunting figures, once run against real KDHS data.
 ## `outputs/maps/county_immunisation_map.png`, `outputs/maps/county_sba_map.png`
 
 Same recovery, same provenance, same caveat as the stunting map above
-(`Project7_task2.pdf` Figures 6 and 9). **Not yet wired into an app page** —
-no Immunisation or SBA regional page exists yet in `app/pages/`; these are
-staged here for whoever builds that page next.
+(`Project7_task2.pdf` Figures 6 and 9). Surfaced on
+`app/pages/5_Spatial_Bayesian_Analysis.py` — no county-level immunisation or
+SBA *number* has been computed in this branch yet (only the recovered
+national concentration index), so a dedicated regional page for either
+indicator would have nothing behind it beyond this recovered image.
 
 ## `outputs/tables/task4_priority_counties.png`
 

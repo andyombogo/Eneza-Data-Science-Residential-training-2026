@@ -6,7 +6,13 @@ presentation layer over those files, not a second source of truth. When
 PLAN.md's checklist changes, update DELIVERABLES below to match.
 """
 
+import sys
+from pathlib import Path
+
 import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils import page_footer
 
 st.set_page_config(page_title="Problem Statement — Project 7", page_icon="📋", layout="wide")
 
@@ -59,15 +65,16 @@ TASK2_DELIVERABLES = [
     ("County stunting CSV + confidence intervals", True),
     ("Wealth-equity concentration indices (stunting, immunisation, SBA)", True),
     ("County stunting choropleth map", True),
-    ("Immunisation & SBA county maps (recovered, not yet on a page)", True),
+    ("Immunisation & SBA county maps (recovered, now on the Spatial & Bayesian Analysis page)", True),
     ("Age-band reconciliation (6–59mo vs. 12–35mo stunting definitions)", False),
     ("Immunisation analysis ported into this branch's pipeline & executed", False),
     ("Skilled birth attendance analysis ported into this branch's pipeline & executed", False),
     ("Stunting map regenerated on the 6–59mo band", False),
-    ("Immunisation & SBA regional app pages built", False),
+    ("Immunisation & SBA regional app pages (no county-level number exists to build one around — see Data page)", False),
     ("Discrete wealth-quintile CSV (5-quintile breakdown per indicator)", False),
     ("Adjusted ORs by wealth status (stunting/immunisation/SBA) — source pulled 2026-08-03, not yet run", False),
     ("Small-area estimation (INLA + MBG, now prepped for all 3 indicators) — stretch goal", False),
+    ("App audited & restructured: Data/Methodology/Spatial/Downloads/About pages, interactive viz, error handling, download buttons (2026-08-03)", True),
 ]
 
 TASK4_DELIVERABLES = [
@@ -127,3 +134,11 @@ st.markdown(
     "5. **Team review of the Ethics & Data Protection notes** and a "
     "rendered Quarto report attached for submission."
 )
+
+st.caption(
+    "Full requirement-by-requirement gap analysis: `docs/task2_audit_report.md`. "
+    "See the Data page for a live completeness check and the Spatial & "
+    "Bayesian Analysis page for the INLA/MBG code audit."
+)
+
+page_footer("Problem Statement")
