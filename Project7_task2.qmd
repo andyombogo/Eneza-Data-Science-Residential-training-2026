@@ -492,7 +492,7 @@ cc_plot_data |>
     fill = "white",
     colour = "black") +
   labs(
-    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    x = "Cumulative % of children, ranked by wealth (Low \u2192 High)",
     y = "Cumulative % of stunted children") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
@@ -879,7 +879,7 @@ cc_plot_data_immunn |>
     fill = "white",
     colour = "black") +
   labs(
-    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    x = "Cumulative % of children, ranked by wealth (Low \u2192 High)",
     y = "Cumulative % of non fully vaccinated children",
     subtitle = NULL) +
   theme_classic(base_family = "Candara", base_size = 13) +
@@ -1179,7 +1179,7 @@ cc_plot_data_sba |>
     fill = "white",
     colour = "black") +
   labs(
-    x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+    x = "Cumulative % ranked by wealth (Low \u2192 High)",
     y = "Cumulative % of skilled birth attendance") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
