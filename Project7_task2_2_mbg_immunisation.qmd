@@ -1,0 +1,891 @@
+---
+title: "How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile"
+author: Kevinson Mwangi, Elphas Abok, Jared Onsomu, and John Andrew
+date: today
+date-format: "DD MMMM YYYY"
+format: 
+  typst:
+    citeproc: true
+    template-partials: 
+      - typst-show.typ
+      - typst-template.typ
+editor_options: 
+  chunk_output_type: console
+---
+
+### Model Based Geostatistics - Full vaccination
+#### 1. Spatial distribution of full vaccination
+
+Packages and data 
+```{r}
+#| label: package-setup
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+rm(list = ls())
+pacman::p_load(
+  tidyverse, haven, labelled, epiDisplay, survey,
+  gtsummary, extrafont, flextable, PrevMap)
+
+## Loading the data as cleaned from the descriptive and exploratory analysis
+
+df_immunisation_mbg <- 
+    read_dta(
+        "./Data/Derived_data/df_immunisation.dta") |> 
+          mutate(
+            fully_vacc = ifelse(
+              fully_vaccinated == "Fully vaccinated", 1, 0))
+```
+
+
+Covariates assembly
+
+```{r}
+#| label: covariates
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+### Child age
+skimr::skim(df_immunisation_mbg$age_months)
+
+### Age categorised
+df_immunisation_mbg <- df_immunisation_mbg |> 
+mutate(
+    age_months_cat = 
+      case_when(
+        age_months >= 12 & age_months < 24 ~ "12-23 months",
+        age_months >= 24 & age_months < 36 ~ "24-35 months",
+        TRUE ~ NA_character_) |> 
+      factor(
+        levels = 
+          c("12-23 months", "24-35 months")) |> 
+      relevel(ref = "12-23 months"))
+
+tab1(df_immunisation_mbg$age_months_cat, graph = F)
+
+### Child gender
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    child_sex = b4,
+    child_sex = 
+      factor(
+        child_sex,
+        levels = c(1, 2),
+        labels = c("Male", "Female")))
+
+tab1(df_immunisation_mbg$child_sex, graph = F)
+
+### Parity
+skimr::skim(df_immunisation_mbg$v201)
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    parity = ifelse(v201 < 3, "1 or 2", "3+") |> 
+      factor(
+        levels = c("1 or 2", "3+")) |> 
+      relevel(ref = "1 or 2"))
+
+tab1(df_immunisation_mbg$parity, graph = F)
+
+### Mother's age
+skimr::skim(df_immunisation_mbg$v012)
+
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    mother_age = v012,
+    mother_age_cat = 
+      case_when(
+        mother_age < 20 ~ "15-19",
+        mother_age >= 20 & mother_age < 35 ~ "20-34",
+        mother_age >= 35 & mother_age < 50 ~ "35+",
+        TRUE ~ NA_character_) |> 
+      factor(
+        levels = c("15-19", "20-34", "35+")) |> 
+      relevel(ref = "15-19"))
+
+tab1(df_immunisation_mbg$mother_age_cat, graph = F)
+
+## Mother's marital status
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    marital_status = 
+      case_when(
+        v501 %in% c(0, 3, 4, 5) ~ "Not in a union",
+        v501 %in% c(1, 2) ~ "In a union",
+        TRUE ~ NA_character_) |> 
+      as.factor() |> 
+      relevel(ref = "Not in a union"))
+
+tab1(df_immunisation_mbg$marital_status, graph = F)
+
+## Mother's education
+df_immunisation_mbg |> dplyr::select(sreduc, v106, v149)
+
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    education = 
+      case_when(
+        v106 == 0 ~ "No education",
+        v106 == 1 ~ "Primary",
+        v106 %in% c(2, 3) ~ "Secondary or higher",
+        TRUE ~ NA_character_) |> 
+      factor(
+        levels = c("No education", "Primary", "Secondary or higher")) |> 
+      relevel(ref = "No education"))
+
+tab1(df_immunisation_mbg$education, graph = F)
+
+## Mother's employment status
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    mother_working = ifelse(v714 == 1, "Yes", "No") |> 
+      as.factor() |> 
+      relevel(ref = "No"))
+tab1(df_immunisation_mbg$mother_working, graph = F)
+
+## Household wealth index
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    wealth_status = 
+      case_when(
+        v190 %in% c(1, 2) ~ "Low",
+        v190 == 3 ~ "Middle",
+        v190 %in% c(4, 5) ~ "High") |> 
+      factor(
+        levels = c("Low", "Middle", "High")) |> 
+      relevel(ref = "Low"))
+
+tab1(df_immunisation_mbg$wealth_status, graph = F)
+
+## Area of residence
+df_immunisation_mbg <- df_immunisation_mbg |> 
+  mutate(
+    residence = ifelse(v025 == 1, "Urban", "Rural") |> 
+      as.factor() |> 
+      relevel(ref = "Rural"))
+
+tab1(df_immunisation_mbg$residence, graph = F)
+
+```
+
+
+Selecting the cleaned variables
+
+
+```{r}
+#| label: final-data
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_immunisation_mbg_complete <- df_immunisation_mbg |> 
+  dplyr::select(
+    v001, id = v021, strata = v022, wt, fully_vaccinated,
+    fully_vacc, age_months, age_months_cat, child_sex,
+    parity, mother_age, mother_age_cat, marital_status,
+    education,   mother_working, wealth_status, residence)
+
+```
+
+
+Survey setting
+
+
+```{r}
+#| label: survey-setting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+mysurvey <- svydesign(
+  id = ~id,       
+  strata = ~strata,      
+  weights = ~wt,       
+  data = df_immunisation_mbg_complete,
+  nest = TRUE)  
+
+options(survey.lonely.psu = "adjust") # adjust for case where there may be 1 psu in a strata
+
+```
+
+
+Characteristics of study participants
+
+
+```{r}
+#| label: tbl-participant-characteristics
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+gtsummary::theme_gtsummary_journal("jama")
+
+tbl_svysummary(
+  mysurvey,
+  by = fully_vaccinated,
+  include = c(
+    age_months_cat, child_sex,
+    mother_age_cat, marital_status,
+    education, mother_working, parity, wealth_status, residence),
+  statistic = list(
+    all_continuous() ~ "{mean} ({sd})",
+    all_categorical() ~ "{n} ({p})"),
+  digits = list(
+    all_continuous() ~ c(2, 1),
+    all_categorical() ~ c(0, 1)),
+  label = list(
+    age_months_cat ~ "Child age (months)",
+    child_sex ~ "Child sex",
+    mother_age_cat ~ "Age of the mother (years)",
+    marital_status ~ "Mother's marital status",
+    education ~ "Highest level of completed education of mother",
+    mother_working ~ "Mother's employment status",
+    parity ~ "Parity",
+    wealth_status ~ "Household wealth status",
+    residence ~ "Area of residence"),
+  missing = "ifany",
+  missing_text = "Missing") |>
+  add_overall() |>
+  add_p(
+    test = list(
+      all_continuous() ~ "svy.t.test",
+      all_categorical() ~ "svy.chisq.test"),
+    pvalue_fun = ~ style_pvalue(.x, digits = 3)) |>
+  italicize_levels() |> 
+  as_flex_table() |> 
+  autofit() |> 
+  flextable::font(fontname = "Candara", part = "all") |> 
+  flextable::fontsize(size = 11, part = "all") |> 
+  flextable::align(
+    j = c(2, 3, 4, 5), 
+    align = c("left", "left", "left", "right"), 
+    part = "all")
+  
+```
+
+
+Univariable regression models
+
+
+```{r}
+#| label: univariable-regression
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+tbl_uvregression(
+  mysurvey,
+  method = svyglm,
+  y = fully_vacc,
+  method.args = list(family = quasibinomial()),  
+  include = c(age_months_cat, child_sex, parity,
+              mother_age_cat, marital_status,
+              education, mother_working, wealth_status, residence),
+  exponentiate = TRUE,      
+  label = list(
+    age_months_cat ~ "Child age (months)",
+    child_sex ~ "Child sex",
+    mother_age_cat ~ "Age of the mother (years)",
+    marital_status ~ "Mother's marital status",
+    education ~ "Highest level of completed education of mother",
+    mother_working ~ "Mother's employment status",
+    parity ~ "Parity",
+    wealth_status ~ "Household wealth status",
+    residence ~ "Area of residence"),
+  pvalue_fun = ~ style_pvalue(.x, digits = 3)) |> 
+  italicize_levels() |> 
+  bold_p() |> 
+   as_flex_table() |> 
+  autofit() |> 
+  flextable::font(fontname = "Candara", part = "all") |> 
+  flextable::fontsize(size = 11, part = "all") |> 
+  align(
+    j = c(2, 3, 4), 
+    align = c("left", "left", "right"), 
+    part = "all")
+```
+
+
+
+```{r}
+#| label: multivariable-regression
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+mult_model_immunisation <- tbl_regression(
+  svyglm(
+  fully_vacc ~ age_months_cat + child_sex +
+    mother_age_cat + marital_status + education + 
+    mother_working + parity + wealth_status + residence,
+  design = mysurvey,
+  family = quasibinomial()),
+  exponentiate = TRUE,
+  label = list(
+    age_months_cat ~ "Child age (months)",
+    child_sex ~ "Child sex",
+    mother_age_cat ~ "Age of the mother (years)",
+    marital_status ~ "Mother's marital status",
+    education ~ "Highest level of completed education of mother",
+    mother_working ~ "Mother's employment status",
+    parity ~ "Parity",
+    wealth_status ~ "Household wealth status",
+    residence ~ "Area of residence"),
+  pvalue_fun = ~ style_pvalue(.x, digits = 3)) |>
+  italicize_levels() |>
+  bold_p() |>
+  as_flex_table() |>
+  autofit() |>
+  font(fontname = "Candara", part = "all") |>
+  fontsize(size = 11, part = "all") |>
+  align(
+    j = c(2, 3),
+    align = c("left", "right"),
+    part = "all")
+
+mult_model_immunisation
+
+write_csv(
+mult_model_immunisation$body$dataset |> 
+  as.data.frame() |> 
+  filter(
+    label %in% 
+      c("Household wealth status", "Low", "Middle", "High")),
+
+    "./Data/Derived_estimates/dhs_immunisation_WI_adjusted_OR.csv")
+
+```
+
+
+
+```{r}
+#| label: recode-selected-variables
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+df_immunisation_mbg_complete_final <- df_immunisation_mbg_complete |> 
+  mutate(
+    age_months_cat_rec = 
+      ifelse(
+    age_months_cat == "12-23 months", 0, 1),
+    child_sex_rec = ifelse(child_sex == "Male", 0, 1),
+    parity_rec = ifelse(parity == "1 or 2", 1, 0),
+    age_mother_rec = ifelse(mother_age_cat == "35+", 1, 0),
+    marital_status_rec = ifelse(marital_status == "In a union", 1, 0),
+    education_rec = ifelse(education == "No education", 0, 1),
+    employment_rec = ifelse(mother_working == "Yes", 1, 0),
+    wealth_status_rec = ifelse(wealth_status == "Low", 0, 1),
+    residence_rec = ifelse(residence == "Rural", 0, 1))
+
+```
+
+
+Data collapse in prep for MBG
+
+
+```{r}
+#| label: data-collapse
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+collapsed_immunisation_data <- df_immunisation_mbg_complete_final |>
+  group_by(v001) |>
+  summarise(
+    fully_vaccinated = sum(fully_vacc, na.rm = TRUE),
+    total = sum(!is.na(fully_vacc)),
+    across(
+      c(
+        age_months_cat_rec, child_sex_rec, parity_rec,
+        age_mother_rec, marital_status_rec, education_rec,
+        employment_rec, wealth_status_rec, residence_rec),
+      ~ mean(.x, na.rm = TRUE)),
+    .groups = "drop")
+
+```
+
+
+MBG Exploratory analysis
+
+```{r}
+#| label: exploratory-analysis
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+## Log logit
+
+collapsed_immunisation_data$logit <- log(
+  (collapsed_immunisation_data$fully_vaccinated + 0.5) / (collapsed_immunisation_data$total - collapsed_immunisation_data$fully_vaccinated + 0.5))
+
+
+theme_set(
+  theme_bw(base_family = "Candara", base_size = 14) +
+    theme(
+      panel.grid = element_blank()))
+
+## Child age
+age_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = age_months_cat_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Children with older age", 
+    y = "Empirical logit")
+
+
+## Child sex
+sex_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = child_sex_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Gender", 
+    y = "Empirical logit")
+
+
+## Parity
+parity_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = parity_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Parity", 
+    y = "Empirical logit")
+
+
+## Mother age
+age_mother_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = age_months_cat_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Older mothers", 
+    y = "Empirical logit")
+
+
+## Marital status
+marital_status_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = marital_status_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Married women", 
+    y = "Empirical logit")
+
+## Education
+education_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = education_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Higher education coverage", 
+    y = "Empirical logit")
+
+
+## Employment
+employment_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = employment_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Coverage of employment", 
+    y = "Empirical logit")
+
+
+## Wealth status
+wealth_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = wealth_status_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Coverage of wealth status", 
+    y = "Empirical logit")
+
+
+## Residence
+residence_graph <- collapsed_immunisation_data |> 
+  ggplot(
+    aes(x = residence_rec, y = logit)) + 
+  geom_point() + 
+  stat_smooth(
+    method = "gam",
+    formula = y ~ s(x), 
+    se = F) +
+  stat_smooth(
+    method = "lm",
+    formula = y ~ x,
+    col = "red",
+    lty = 2, 
+    se = F) + 
+  labs(
+    x = "Coverage of residence", 
+    y = "Empirical logit")
+
+
+library(patchwork)
+
+(age_graph / sex_graph / parity_graph / age_mother_graph) | (marital_status_graph / education_graph / employment_graph) | (wealth_graph / residence_graph)
+
+```
+
+
+Checking for multicollinearity
+
+
+```{r}
+#| label: correlation-plot
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+library(ggcorrplot)
+
+ggcorrplot(
+  cor(
+    collapsed_immunisation_data[, c(
+      "age_months_cat_rec", "child_sex_rec", "parity_rec",
+        "age_mother_rec", "marital_status_rec", "education_rec",
+        "employment_rec", "wealth_status_rec", "residence_rec")],
+    use = "pairwise.complete.obs"),
+  type = "lower",
+    ggtheme = ggplot2::theme_bw(base_family = "Candara") +
+         theme(panel.grid = element_blank()),
+    hc.order = F,
+    show.diag = F,
+    outline.col = "white",
+    lab = TRUE,
+    legend.title = "Correlation")
+
+```
+
+
+Grid formation
+
+
+```{r}
+#| label: spatial-data-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+pacman::p_load(rgeoboundaries, sf)
+
+kenya_shp <- geoboundaries("Kenya", "adm1") |> 
+  st_as_sf()
+
+write_sf(kenya_shp, "./Data/Derived_data/kenya_counties.shp")
+
+
+## DHS cluster shapefile
+
+cluster_df <- st_read("./Data/Shapefiles/KEGE8AFL.shp")
+  
+# Merging the collapsed data to the cluster shp
+collapsed_immunisation_data$v001 <- 
+  as.integer(collapsed_immunisation_data$v001)
+
+cluster_df$DHSCLUST <- as.integer(cluster_df$DHSCLUST)
+
+immun_data_shp <- cluster_df |> 
+  left_join(collapsed_immunisation_data, by = c("DHSCLUST" = "v001"))
+
+immun_data_shp_utm <- st_transform(immun_data_shp, 21037)
+
+
+## Extract UTM coordinates
+utm_coords <- st_coordinates(immun_data_shp_utm)
+immun_data_shp_utm$utm_x <- utm_coords[, 1]
+immun_data_shp_utm$utm_y <- utm_coords[, 2]
+
+
+## Extract longitude/latitude
+immun_data_shp_latlon <- st_transform(immun_data_shp_utm, 4326)
+latlon_coords <- st_coordinates(immun_data_shp_latlon)
+
+immun_data_shp_utm$longitude <- latlon_coords[, 1]
+immun_data_shp_utm$latitude <- latlon_coords[, 2]
+
+save(
+  immun_data_shp_utm,
+  file = "./Data/Derived_data/immun_data_shp_utm.RData")
+
+
+## Kenya Grid creation
+kenya_shp2 <- st_as_sf(kenya_shp)
+
+## Transform shapefile
+kenya_shp_utm <- st_transform(kenya_shp2, 21037)
+utm_coords <- st_coordinates(immun_data_shp_utm)
+immun_data_shp$utm_x <- utm_coords[, 1]
+immun_data_shp$utm_y <- utm_coords[, 2]
+
+## Union geometry
+kenya_union <- st_union(kenya_shp_utm)
+
+## Create grid centers
+kenya.grid.sq <- st_make_grid(
+  kenya_shp_utm,
+  cellsize = 5000,
+  what = "centers")
+
+
+## Keep only points inside Kenya
+kenya.inout <- st_intersects(
+  kenya.grid.sq,
+  kenya_union,
+  sparse = F)
+
+kenya.grid <- kenya.grid.sq[kenya.inout]
+
+
+## Convert grid to sf object
+kenya.grid.sf <- st_sf(
+  geometry = kenya.grid,
+  crs = 21037)
+
+## Join county names from polygons
+kenya.grid.sf <- st_join(
+  kenya.grid.sf,
+  kenya_shp_utm["shapeName"],
+  join = st_intersects)
+
+
+## Rename county column
+kenya.grid.sf <- kenya.grid.sf %>%
+  rename(county = shapeName)
+
+
+# Extract UTM coordinates
+utm_coords <- st_coordinates(kenya.grid.sf)
+
+# Transform to lon/lat
+kenya.grid.latlon <- st_transform(kenya.grid.sf, 4326)
+
+# Extract lon/lat coordinates
+latlon_coords <- st_coordinates(kenya.grid.latlon)
+
+# Final dataframe
+kenya.grid.pred <- kenya.grid.sf %>%
+  st_drop_geometry() %>%
+  mutate(
+    utm_x    = utm_coords[,1],
+    utm_y    = utm_coords[,2],
+    longitude = latlon_coords[,1],
+    latitude  = latlon_coords[,2])
+
+```
+
+
+Empirical logit
+
+
+```{r}
+#| label: empirical-logit
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+## Empirical logit variable
+immun_data_shp_utm$fully_vaccination_prev2 <- 
+  immun_data_shp_utm$fully_vaccinated / immun_data_shp_utm$total *100
+
+plot(immun_data_shp_utm["fully_vaccination_prev2"])
+
+library(tmap)
+
+tm_shape(immun_data_shp_utm) +
+  tm_symbols(
+    size = "fully_vaccination_prev2",
+    col = "fully_vaccination_prev2",
+    palette = "viridis",
+    alpha = 0.7,
+    border.col = "black",
+    border.lwd = 0.2) +
+  tm_layout(legend.outside = TRUE)
+
+immunisation_df <- data.frame(immun_data_shp_utm)
+
+immunisation_df$logit <- log(
+  (immunisation_df$fully_vaccinated + 0.5) / 
+    (immunisation_df$total - immunisation_df$fully_vaccinated + 0.5))
+
+```
+
+
+\newpage
+
+Residual spatial correlation
+
+```{r}
+#| label: residual-spatial-correlation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: false
+
+## Variogram
+
+library(PrevMap)
+
+immunisation_df$utm_x <- immunisation_df$utm_x/1000
+immunisation_df$utm_y <- immunisation_df$utm_y/1000
+
+vars <- c(
+  "fully_vaccinated", "age_months_cat_rec", "child_sex_rec",
+  "parity_rec", "age_mother_rec", "marital_status_rec",
+  "education_rec", "employment_rec", "wealth_status_rec",
+  "residence_rec", "total", "utm_x", "utm_y", "longitude",  
+  "latitude")
+
+
+immunisation_df_clean <- immunisation_df %>%
+  dplyr::select(all_of(vars)) %>%
+  na.omit()
+
+par(bty = "o")
+
+
+variog <- spat.corr.diagnostic(
+  fully_vaccinated ~ age_months_cat_rec + child_sex_rec + 
+    parity_rec + age_mother_rec + marital_status_rec +
+    education_rec + employment_rec + wealth_status_rec +
+    residence_rec,
+  units.m = ~ total,
+  coords = ~utm_x + utm_y,
+  likelihood = "Binomial",
+  lse.variogram = T,
+  data = immunisation_df_clean)
+
+```
+
+Covariates standardisation
+
+```{r}
+#| label: covariate-standardisation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+for (i in c("age_months_cat_rec", "child_sex_rec", "parity_rec",
+"age_mother_rec", "marital_status_rec", "education_rec",      "employment_rec", "wealth_status_rec", "residence_rec")) {
+
+ newvar <- paste0(i, "_z")
+ immunisation_df_clean[[newvar]] <- 
+  as.numeric(scale(immunisation_df_clean[[i]]))
+}
+
+```
+
+Unique spatial locations
+
+```{r}
+#| label: unique-spatial-locations
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+ID.coords <- create.ID.coords(
+  data = immunisation_df_clean, 
+  ~I(utm_x)+I(utm_y))
+set.seed(123)
+
+```
+
