@@ -1,0 +1,575 @@
+---
+title: "How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region"
+author: Kevinson Mwangi, Elphas Abok, Jared Onsomu, and John Andrew
+date: today
+date-format: "DD MMMM YYYY"
+format: 
+  typst:
+    citeproc: true
+    template-partials: 
+      - typst-show.typ
+      - typst-template.typ
+editor_options: 
+  chunk_output_type: console
+---
+
+# SMOOTHED GEOSTATISTICAL MAP OF CHILDHOOD FULL VACCINATION PREVALENCE
+# Bayesian spatial (SPDE / INLA) model, DHS cluster data, Kenya
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+pacman::p_load(tidyverse, sf, sp, INLA, terra, 
+rKenyaCensus, viridis, scales, patchwork)  
+```
+
+
+```{r}
+#| label: mesh-settings
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+grid_resolution_m <- 5000     # prediction raster cell size, metres (UTM)
+mesh_max_edge <- c(10000, 50000)  # inner / outer triangle edge length
+mesh_cutoff <- 5000    # minimum distance between mesh points
+mesh_offset <- c(10000, 50000) # inner / outer extension buffer
+exceedance_threshold <- 0.20    
+
+```
+
+
+
+```{r}
+#| label: data-prep
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+load("./Data/Derived_data/sba_data_shp_utm.RData")
+
+dat <- sba_data_shp_utm |>
+  dplyr::select(
+    DHSID, ADM1NAME, LATNUM, LONGNUM, sba, total, parity_rec, age_mother_rec, marital_status_rec, education_rec, employment_rec,
+    wealth_status_rec, residence_rec,
+    utm_x, utm_y, geometry) |>
+  mutate(
+    prevalence = sba / total,
+    cluster_id = factor(row_number()))
+
+coords <- cbind(dat$utm_x, dat$utm_y)
+
+```
+
+```{r}
+#| label: quick-eda
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Quick EDA: raw observed cluster prevalence, before any modelling
+
+sba_observed_cluster <- dat |>
+  ggplot() +
+  geom_sf(
+    data = rKenyaCensus::KenyaCounties_SHP |> 
+      st_as_sf(), 
+  fill = "white") +
+  geom_sf(
+    aes(
+      colour = prevalence),
+      alpha = 0.85,
+      size = .55) +
+  scale_colour_viridis_c(
+    name = "", 
+    option = "F",
+    labels = scales::percent) +
+  scale_size_continuous(
+    name = "Children\nsampled",
+     range = c(1, 5)) +
+  labs(
+    subtitle = "Skilled birth attendance") +
+  theme_minimal(base_family = "Candara", base_size = 12) +
+  theme(
+   axis.text = element_blank(),
+   axis.title = element_blank(),
+   plot.subtitle = element_text(hjust = .75, vjust = -10),
+   panel.grid = element_blank(),
+   plot.background = element_rect(fill = "gray96"))
+
+sba_observed_cluster
+
+ggsave(
+  "./Plots/Sba_observed_prev_map.png",
+  sba_observed_cluster,
+  width = 8,
+  height = 6,
+  dpi = 500,
+  bg = "white")
+
+```  
+
+# STUDY-AREA BOUNDARY 
+
+```{r}
+#| label: area-boundary
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+kenya <- rKenyaCensus::KenyaCounties_SHP |>
+  st_as_sf() |>
+  summarise() |>                 
+  st_transform(st_crs(dat))      
+
+```
+
+# MESH  (boundary-aware, extended domain)
+
+```{r}
+#| label: area-boundary
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+kenya_boundary <- inla.sp2segment(
+  sf::as_Spatial(kenya))
+
+mesh <- inla.mesh.2d(
+  loc      = coords,
+  boundary = kenya_boundary,
+  max.edge = mesh_max_edge,
+  cutoff   = mesh_cutoff,
+  offset   = mesh_offset)
+
+plot(mesh, main = "Mesh with cluster locations")
+points(coords, col = "red", pch = 16, cex = 0.5)
+
+```
+
+#  SPDE MODEL 
+
+```{r}
+#| label: spde-model
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+spde <- inla.spde2.pcmatern(
+  mesh,
+  prior.range = c(50000, 0.5),
+  prior.sigma = c(1, 0.01))
+
+index <- inla.spde.make.index(name = "spatial", n.spde = spde$n.spde)
+
+A <- inla.spde.make.A(mesh, loc = coords)
+
+```
+
+# ESTIMATION STACK  
+```{r}
+#| label: estimation-stack
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+stack <- inla.stack(
+  data = list(
+    y = dat$sba,
+    Ntrials = dat$total
+  ),
+  A = list(A, 1),
+  effects = list(
+    spatial = index,
+    data.frame(
+      intercept  = 1,
+      wealth     = factor(dat$wealth_status_rec),
+      education  = factor(dat$education_rec),
+      residence  = factor(dat$residence_rec),
+      parity     = factor(dat$parity_rec),
+      cluster_id = dat$cluster_id
+    )
+  ),
+  tag = "est")
+
+```
+
+
+# MODEL FORMULA  
+
+```{r}
+#| label: estimation-stack
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+formula <- y ~
+  0 + intercept +
+  wealth +
+  education +
+  residence +
+  parity +
+  f(spatial, model = spde) +
+  f(cluster_id, model = "iid")   
+
+```
+
+# FIT THE ESTIMATION MODEL
+
+```{r}
+#| label: model-fitting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+fit <- inla(
+  formula,
+  family  = "binomial",
+  Ntrials = dat$total,
+  data    = inla.stack.data(stack),
+  control.predictor = list(
+    A       = inla.stack.A(stack),
+    compute = TRUE
+  ),
+  control.compute = list(
+    dic  = TRUE,
+    waic = TRUE,
+    cpo  = TRUE          
+  )
+)
+
+summary(fit)
+
+```
+
+
+# Diagnostics 
+
+
+```{r}
+#| label: diagnostics
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+
+cat("Number of CPO failures:", sum(fit$cpo$failure > 0, na.rm = TRUE), "\n")
+
+spde_result <- inla.spde2.result(fit, "spatial", spde)
+
+cat("Posterior median spatial range (km):",
+    round(inla.qmarginal(0.5, spde_result$marginals.range.nominal[[1]]) / 1000, 1), "\n")
+
+cat("Posterior median spatial sigma:",
+    round(inla.qmarginal(0.5, spde_result$marginals.variance.nominal[[1]])^0.5, 3), "\n")
+
+# Fitted vs. observed prevalence at the surveyed clusters 
+
+idx_est <- inla.stack.index(stack, "est")$data
+fitted_est <- fit$summary.fitted.values[idx_est, ]
+
+diagnostics_sba <- ggplot(
+  data.frame(observed = dat$prevalence, fitted = fitted_est$mean),
+  aes(observed, fitted)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(
+    slope = 1, 
+    intercept = 0, 
+    lty = 2, 
+    colour = "grey40") +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(
+    subtitle = "Fitted vs. observed cluster prevalence - SBA",
+    x = "Observed",
+    y = "Model fitted (posterior mean)") +
+  theme_bw(base_family = "Candara", base_size = 12) +
+  theme(
+    panel.grid = element_blank())
+
+diagnostics_sba
+
+ggsave(
+  "./Plots/fitted_vs_observed_sba.png",
+  diagnostics_sba,
+  width = 5,
+  height = 5,
+  dpi = 500,
+  bg = "white")
+
+```
+
+
+
+# PREDICTION GRID  
+
+
+```{r}
+#| label: prediction-grid
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| 
+kenya_vect <- terra::vect(kenya)
+r_template <- terra::rast(kenya_vect, resolution = grid_resolution_m)
+r_mask <- terra::rasterize(kenya_vect, r_template, field = 1)
+
+idx_in <- which(!is.na(terra::values(r_mask)))
+coords_pred  <- terra::xyFromCell(r_mask, idx_in) 
+n_pred <- nrow(coords_pred)
+
+cat("Number of prediction grid cells inside Kenya:", n_pred, "\n")
+
+# Projector matrix from mesh nodes to the prediction locations
+A_pred <- inla.spde.make.A(mesh, loc = coords_pred)
+
+```
+
+
+# PREDICTION COVARIATES 
+
+```{r}
+#| label: prediction-covariates
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| 
+# Individual/household-level covariates (child age, sex, parity, wealth,
+# education, residence) don't have a well-defined value "at a location"
+# independent of a specific household -- there's no single correct answer
+# to "what is the wealth level at this pixel?". Working option described below
+#
+#   (a) Set every covariate to a single population-weighted
+#       reference profile (the empirically most common level, weighted by
+#       number of children sampled), applied UNIFORMLY across the grid.
+#       This yields a "reference-child" prevalence surface: how prevalence
+#       varies spatially for a child with typical characteristics. All
+#       spatial pattern in the resulting map comes from the estimated
+#       spatial field -- nothing is borrowed from nearby clusters, so there
+#       are no artificial Voronoi-cell boundaries.
+
+
+get_weighted_mode <- function(level_vec, weight_vec) {
+  agg <- tapply(weight_vec, level_vec, sum, na.rm = TRUE)
+  names(agg)[which.max(agg)]
+}
+
+ref_levels <- list(
+  wealth    = get_weighted_mode(dat$wealth_status_rec,  dat$total),
+  education = get_weighted_mode(dat$education_rec,      dat$total),
+  residence = get_weighted_mode(dat$residence_rec,       dat$total),
+  parity    = get_weighted_mode(dat$parity_rec,          dat$total)
+)
+
+print(ref_levels)
+
+pred_data <- data.frame(
+  intercept  = 1,
+  wealth     = factor(rep(ref_levels$wealth,    n_pred), levels = levels(factor(dat$wealth_status_rec))),
+  education  = factor(rep(ref_levels$education, n_pred), levels = levels(factor(dat$education_rec))),
+  residence  = factor(rep(ref_levels$residence, n_pred), levels = levels(factor(dat$residence_rec))),
+  parity     = factor(rep(ref_levels$parity,    n_pred), levels = levels(factor(dat$parity_rec))))
+
+stack_pred <- inla.stack(
+  data    = list(y = NA),
+  A       = list(A_pred, 1),
+  effects = list(spatial = index, pred_data),
+  tag     = "prediction")
+
+stack_full <- inla.stack(stack, stack_pred)
+```
+
+
+# REFIT WITH THE PREDICTION STACK APPENDED
+
+
+```{r}
+#| label: prediction-refit
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+fit_pred <- inla(
+  formula,
+  family  = "binomial",
+  Ntrials = c(dat$total, rep(1, nrow(pred_data))),
+  data    = inla.stack.data(stack_full),
+  control.predictor = list(
+    A       = inla.stack.A(stack_full),
+    compute = TRUE,
+    link    = 1
+  )
+)
+
+idx_pred <- inla.stack.index(stack_full, tag = "prediction")$data
+pred <- fit_pred$summary.fitted.values[idx_pred, ]
+
+```
+
+
+# Exceedance probability: P(prevalence > threshold)
+
+```{r}
+#| label: exceedance-probability
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+exceed_prob <- vapply(
+  fit_pred$marginals.fitted.values[idx_pred],
+  function(m) 1 - inla.pmarginal(exceedance_threshold, m),
+  numeric(1)
+)
+
+```
+
+
+# WRITE PREDICTIONS BACK INTO RASTERS
+
+```{r}
+#| label: write-predictions
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+fill_raster <- function(template, idx, vals) {
+  out <- template
+  v <- rep(NA_real_, terra::ncell(template))
+  v[idx] <- vals
+  terra::values(out) <- v
+  out
+}
+
+r_mean    <- fill_raster(r_mask, idx_in, pred$mean)
+r_sd      <- fill_raster(r_mask, idx_in, pred$sd)
+r_lower   <- fill_raster(r_mask, idx_in, pred$`0.025quant`)
+r_upper   <- fill_raster(r_mask, idx_in, pred$`0.975quant`)
+#r_exceed  <- fill_raster(r_mask, idx_in, exceed_prob)
+r_ciwidth <- r_upper - r_lower   
+
+pred_stack <- c(r_mean, r_sd, r_lower, r_upper, r_ciwidth)
+names(pred_stack) <- c("mean", "sd", "lower95", "upper95", "ci_width")
+
+terra::writeRaster(
+  pred_stack,
+  "./Data/Derived_data/sba_prediction_surface.tif",
+  overwrite = TRUE)
+
+```
+
+# MAPS
+
+```{r}
+#| label: maps
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+ 
+df_mean   <- as.data.frame(r_mean,    xy = TRUE, na.rm = TRUE)
+names(df_mean)[3] <- "prevalence"
+
+df_ciw    <- as.data.frame(r_ciwidth, xy = TRUE, na.rm = TRUE)
+names(df_ciw)[3] <- "ci_width"
+
+#df_exceed <- as.data.frame(r_exceed,  xy = TRUE, na.rm = TRUE)
+#names(df_exceed)[3] <- "p_exceed"
+
+sba_predicted_probs <- ggplot() +
+  geom_raster(
+    data = df_mean, 
+    aes(x, y, fill = prevalence)) +
+  geom_sf(
+    data = kenya, 
+    fill = NA, 
+    colour = "white",
+     linewidth = 0.4,
+     inherit.aes = FALSE) +
+  scale_fill_viridis_c(
+    name    = "Prevalence",
+    option  = "G",
+    direction = 1,
+    labels  = scales::percent_format(accuracy = 1),
+    limits  = c(0.5, max(df_mean$prevalence, na.rm = TRUE))) +
+  coord_sf(crs = st_crs(kenya), expand = FALSE) +
+  labs(
+    subtitle = "Skilled birth attendance") +
+  theme_minimal(base_family = "Candara", base_size = 13) +
+  theme(
+    axis.text  = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    plot.background = element_rect(fill = "gray96"),
+    panel.grid = element_blank(),
+    plot.subtitle = element_text(hjust = .90, vjust = -8))
+
+sba_predicted_probs
+
+ggsave(
+  "./Plots/Sba_predicted_prevalence.png",
+  sba_predicted_probs,
+  width = 5,
+  height = 5,
+  dpi = 500,
+  bg = "white")
+
+```
+
+
+## Combining the plots
+
+
+```{r}
+#| label: maps
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+ggsave(
+  filename = "./Plots/combined_cluster_observed_prev_graphs.png",
+  (stunting_observed_cluster | immunisation_observed_cluster | sba_observed_cluster),
+  width = 12,
+  height = 12,
+  dpi = 500,
+  bg = "white")
+
+
+ggsave(
+  filename = "./Plots/combined_diagnostics_graphs.png",
+  (diagnostics_stunting | diagnostics_immunisation | diagnostics_sba),
+  width = 12,
+  height = 8,
+  dpi = 500,
+  bg = "white")
+
+
+ggsave(
+  filename = "./Plots/combined_predicted_graphs.png",
+  (stunting_predicted_probs | immunisation_predicted_probs | sba_predicted_probs),
+  width = 12,
+  height = 8,
+  dpi = 500,
+  bg = "white")
+
+
+
+```
