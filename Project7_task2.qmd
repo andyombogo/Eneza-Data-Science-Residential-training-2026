@@ -349,7 +349,7 @@ ggsave(
 #| include: true
 #| fig-width: 5
 #| fig-height: 6
-#| fig-cap: "Weighted prevalence of stunting among children 6-59 months at the subnationa levels"
+#| fig-cap: "Weighted prevalence of stunting among children 12-35 months at the subnationa levels"
         
 ## Prevalence maps
 plot_map(
@@ -374,7 +374,7 @@ ggsave(
 ```
 
 
-@fig-prev-map shows the weighted prevalence of stunting among children 6-59 months at the subnational levels. Darker shades shows increasing prevalence
+@fig-prev-map shows the weighted prevalence of stunting among children 12-35 months at the subnational levels. Darker shades shows increasing prevalence
 
 #### Does stunting vary by wealth status?
 ##### Weighted concentration curves
@@ -428,6 +428,27 @@ ci_result <- ci(
   weights = df_stunting$wt,
   type    = "CIw")
 
+## Pulling adjusted OR from the DHS survey weighted analysis
+or_estimates <- read_csv(
+  "./Data/Derived_estimates/dhs_stunting_WI_adjusted_OR.csv") |> 
+    mutate(
+      estimate = ifelse(
+        label == "Low" & is.na(estimate), "Ref", estimate),
+      p.value = ifelse(
+        label == "Low" & is.na(p.value), "Ref", p.value)) |> 
+    filter(
+      label != "Household wealth status")
+
+or_text <- paste0(
+  "Adjusted Odds Ratios for stunting\n by wealth status\n",
+  "----------------------------------------------------------------\n",
+  "Low      Ref\n",
+  "Middle   ", or_estimates$estimate[or_estimates$label == "Middle"],
+  " ; p ", or_estimates$p.value[or_estimates$label == "Middle"], "\n",
+  "High     ", or_estimates$estimate[or_estimates$label == "High"],
+  " ; p ", or_estimates$p.value[or_estimates$label == "High"], "")
+
+
 cc_plot_data |> 
   ggplot(aes(x = cum_prop, y = cum_stunted)) +
   geom_line(color = "navyblue", linewidth = 1) +
@@ -446,6 +467,30 @@ cc_plot_data |>
     family = "Candara",
     hjust = 0, vjust = 1,
     size = 4.0) +
+  annotate(
+    "label",
+    x = 0.05, y = 0.95,
+    label = paste0(
+      "CI (95% CI) = ",
+      round(ci_result$concentration_index, 2),
+      " (",
+      round(confint(ci_result)[1], 2), ", ",
+      round(confint(ci_result)[2], 2), ")"),
+    family = "Candara",
+    hjust = 0,
+    vjust = 1,
+    size = 4) +
+  annotate(
+    "label",
+    x = 0.55,
+    y = 0.45,
+    label = or_text,
+    family = "Candara",
+    hjust = 0,
+    vjust = 1,
+    size = 4,
+    fill = "white",
+    colour = "black") +
   labs(
     x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
     y = "Cumulative % of stunted children") +
@@ -782,6 +827,28 @@ ci_result_immunn <- ci(
   weights = df_immunn_12_23$wt,
   type    = "CIw")
 
+## Pulling adjusted OR from the DHS survey weighted analysis
+or_estimates_immun <- read_csv(
+  "./Data/Derived_estimates/dhs_immunisation_WI_adjusted_OR.csv") |> 
+      mutate(
+            estimate = ifelse(
+                    label == "Low" & is.na(estimate), "Ref", estimate),
+                          p.value = ifelse(
+                                  label == "Low" & is.na(p.value), "Ref", p.value)) |> 
+                                      filter(
+                                            label != "Household wealth status")
+
+                                            or_text_immun <- paste0(
+                                              "Adjusted Odds Ratios for full vaccination\n by wealth status\n",
+                                                "----------------------------------------------------------------\n",
+                                                  "Low      Ref\n",
+                                                    "Middle   ", or_estimates_immun$estimate[or_estimates_immun$label == "Middle"],
+                                                      " ; p ", or_estimates_immun$p.value[or_estimates_immun$label == "Middle"], "\n",
+                                                        "High     ", or_estimates_immun$estimate[or_estimates_immun$label == "High"],
+                                                          " ; p ", or_estimates_immun$p.value[or_estimates_immun$label == "High"], "")
+
+
+
 cc_plot_data_immunn |> 
   ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
   geom_line(color = "darkgreen", linewidth = 1) +
@@ -789,7 +856,7 @@ cc_plot_data_immunn |>
     slope = 1, intercept = 0,
      color = "#813134") +
   annotate(
-    "text",
+    "label",
     x = 0.05, y = 0.95,
     label = paste0(
       "Concentration index (95% CI) = ",
@@ -800,6 +867,17 @@ cc_plot_data_immunn |>
     family = "Candara",
     hjust = 0, vjust = 1,
     size = 4.0) +
+    annotate(
+    "label",
+    x = 0.50,
+    y = 0.43,
+    label = or_text_immun,
+    family = "Candara",
+    hjust = 0,
+    vjust = 1,
+    size = 4,
+    fill = "white",
+    colour = "black") +
   labs(
     x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
     y = "Cumulative % of non fully vaccinated children",
@@ -888,7 +966,7 @@ tbl_sba <- tbl_svysummary(
 
 ```
 
-Weighted prevalence of full vaccination - subnational levels
+Weighted prevalence of  sba - subnational levels
 
 ```{r}
 #| label: fig-prev-counties-sba
@@ -1050,6 +1128,27 @@ ci_result_sba <- ci(
   weights = df_sba$wt,
   type    = "CIw")
 
+
+## Pulling adjusted OR from the DHS survey weighted analysis
+or_estimates_sba <- read_csv(
+  "./Data/Derived_estimates/dhs_sba_WI_adjusted_OR.csv") |> 
+    mutate(
+      estimate = ifelse(
+        label == "Low" & is.na(estimate), "Ref", estimate),
+      p.value = ifelse(
+        label == "Low" & is.na(p.value), "Ref", p.value)) |> 
+    filter(
+      label != "Household wealth status")
+
+or_text_sba <- paste0(
+  "Adjusted Odds Ratios for SBA\n by wealth status\n",
+  "----------------------------------------------------------------\n",
+  "Low      Ref\n",
+  "Middle   ", or_estimates_sba$estimate[or_estimates_sba$label == "Middle"],
+  " ; p ", or_estimates_sba$p.value[or_estimates_sba$label == "Middle"], "\n",
+  "High     ", or_estimates_sba$estimate[or_estimates_sba$label == "High"],
+  " ; p ", or_estimates_sba$p.value[or_estimates_sba$label == "High"], "")
+
 cc_plot_data_sba |> 
   ggplot(aes(x = cum_prop, y = cum_sba)) +
   geom_line(color = "darkgreen", linewidth = 1) +
@@ -1057,7 +1156,7 @@ cc_plot_data_sba |>
     slope = 1, intercept = 0,
      color = "#813134") +
   annotate(
-    "text",
+    "label",
     x = 0.05, y = 0.95,
     label = paste0(
       "Concentration index (95% CI) = ",
@@ -1068,6 +1167,17 @@ cc_plot_data_sba |>
     family = "Candara",
     hjust = 0, vjust = 1,
     size = 4.0) +
+  annotate(
+    "label",
+    x = 0.50,
+    y = 0.43,
+    label = or_text_sba,
+    family = "Candara",
+    hjust = 0,
+    vjust = 1,
+    size = 4,
+    fill = "white",
+    colour = "black") +
   labs(
     x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
     y = "Cumulative % of skilled birth attendance") +
