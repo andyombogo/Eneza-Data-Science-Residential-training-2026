@@ -15,10 +15,9 @@ editor_options:
 ---
 
 <!--
-INTEGRATION NOTE — read once, then delete.
 
 This file merges three source scripts into ONE pipeline that is scoped
-strictly to what the project's own PLAN.md / problem statement asks for:
+strictly to the PLAN.md / problem statement :
 
   1. Project7_task2__2_.qmd        -> the original stunting/immunisation/SBA
                                        descriptive analysis.
