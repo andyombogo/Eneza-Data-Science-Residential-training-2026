@@ -1,5 +1,5 @@
 ---
-title: "Task 2: How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile - Descriptive and exploratory analysis"
+title: "How Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile - Descriptive and exploratory analysis"
 author: Kevinson Mwangi
 date: today
 date-format: "DD MMMM YYYY"
@@ -352,20 +352,25 @@ ggsave(
 #| fig-cap: "Weighted prevalence of stunting among children 12-35 months at the subnationa levels"
         
 ## Prevalence maps
-plot_map(
+map_stunting <- plot_map(
     merged_stunting, fill = prevalence,
     breaks = c(0, 10, 20, 30, 40, 50),
-    labels = c("0–10", "11–20", "21–30", "31–40", "41–50"),
+    labels = c("0–9.9", "10–19.9", "20–29.9", "30–39.9", "40–49.9"),
     legend_title = "Prevalence (%)", subtitle = NULL,
     palette = 7, direction = 1) + 
+    labs(
+      subtitle = "Stunting") +
   theme(
     legend.text = element_text(size = 9),
     legend.background = element_blank(),
     legend.position = c(.18, .12),
     plot.background = element_rect(fill = "gray97"))
 
+map_stunting
+
 ggsave(
   "./Plots/Stunting_map.png",
+  map_stunting,
   width = 8,
   height = 6,
   dpi = 500,
@@ -449,7 +454,7 @@ or_text <- paste0(
   " ; p ", or_estimates$p.value[or_estimates$label == "High"], "")
 
 
-cc_plot_data |> 
+cc_stunting <- cc_plot_data |> 
   ggplot(aes(x = cum_prop, y = cum_stunted)) +
   geom_line(color = "navyblue", linewidth = 1) +
   geom_abline(
@@ -493,13 +498,17 @@ cc_plot_data |>
     colour = "black") +
   labs(
     x = "Cumulative % of children, ranked by wealth (Low \u2192 High)",
-    y = "Cumulative % of stunted children") +
+    y = "Cumulative % of stunted children",
+    subtitle = "Stunting") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
     panel.grid = element_blank())
 
+cc_stunting
+
 ggsave(
   "./Plots/Stunting_concentration_curve.png",
+  cc_stunting,
   width = 7,
   height = 5,
   dpi = 500,
@@ -554,7 +563,7 @@ df_immunn_12_23 <- df |>
             h9 %in% c(1, 2, 3)  # Measles rubella 1
             ), "Fully vaccinated", "Not fully vaccinated"),
         fully_vacc = ifelse(
-            fully_vaccinated == "Fully vaccinated", 0, 1)
+            fully_vaccinated == "Fully vaccinated", 1, 0)
     )
 ```
 
@@ -599,7 +608,7 @@ df_immunn_24_35 <- df |>
             h9a %in% c(1, 2, 3)   # Measles rubella 2
             ), "Fully vaccinated", "Not fully vaccinated"),
         fully_vacc = ifelse(
-            fully_vaccinated == "Fully vaccinated", 0, 1)        
+            fully_vaccinated == "Fully vaccinated", 1, 0)        
     )
 
 ```
@@ -753,7 +762,7 @@ Spatial distribution of full vacciantion among children 12-35 months at the subn
 #| fig-height: 6
 #| fig-cap: "Spatial distribution of full vacciantion among children 12-35 months at the subnationa level"
 
-plot_map(
+map_vaccination <- plot_map(
   merged_immunn,
   fill = prevalence,
   breaks = c(0, 20, 40, 60, 80, 100),
@@ -762,14 +771,19 @@ plot_map(
   subtitle = NULL,
   palette = 7,
   direction = -1) +
+  labs(
+    subtitle = "Full vaccination") +
   theme(
     legend.text = element_text(size = 9),
     legend.background = element_blank(),
     legend.position = c(.18, .12),
     plot.background = element_rect(fill = "gray97"))
 
+map_vaccination
+
 ggsave(
   "./Plots/Vaccination_map.png",
+  map_vaccination,
   width = 8,
   height = 6,
   dpi = 500,
@@ -849,7 +863,7 @@ or_estimates_immun <- read_csv(
 
 
 
-cc_plot_data_immunn |> 
+cc_vaccination <- cc_plot_data_immunn |> 
   ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
   geom_line(color = "darkgreen", linewidth = 1) +
   geom_abline(
@@ -881,13 +895,16 @@ cc_plot_data_immunn |>
   labs(
     x = "Cumulative % of children, ranked by wealth (Low \u2192 High)",
     y = "Cumulative % of non fully vaccinated children",
-    subtitle = NULL) +
+    subtitle = "Full vaccination") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
     panel.grid = element_blank())
+
+  cc_vaccination
   
   ggsave(
   "./Plots/Vaccination_concentration_curve.png",
+  cc_vaccination,
   width = 7,
   height = 5,
   dpi = 500,
@@ -1054,7 +1071,7 @@ Spatial distribution of skilled birth attendance at the subnational level
 #| fig-height: 6
 #| fig-cap: "Spatial distribution of skilled birth attendance at the subnational level"
 
-plot_map(
+map_sba <- plot_map(
   merged_sba,
   fill = prevalence,
   breaks = c(40, 50, 70, 90, 100),
@@ -1063,14 +1080,19 @@ plot_map(
   subtitle = NULL,
   palette = 7,
   direction = -1) +
+  labs(
+    subtitle = "Skilled birth attendance") +
   theme(
     legend.text = element_text(size = 9),
     legend.background = element_blank(),
     legend.position = c(.18, .12),
     plot.background = element_rect(fill = "gray97"))
 
+map_sba
+
 ggsave(
   "./Plots/Sba_map.png",
+  map_sba, 
   width = 8,
   height = 6,
   dpi = 500,
@@ -1119,7 +1141,7 @@ Generating concentration index and plotting
 #| warning: false
 #| cache: false
 #| include: true
-#| fig-cap: "Concentration curves showing "
+#| fig-cap: "Concentration curves showing"
 
 ## Concentration index
 ci_result_sba <- ci(
@@ -1149,7 +1171,7 @@ or_text_sba <- paste0(
   "High     ", or_estimates_sba$estimate[or_estimates_sba$label == "High"],
   " ; p ", or_estimates_sba$p.value[or_estimates_sba$label == "High"], "")
 
-cc_plot_data_sba |> 
+cc_sba <- cc_plot_data_sba |> 
   ggplot(aes(x = cum_prop, y = cum_sba)) +
   geom_line(color = "darkgreen", linewidth = 1) +
   geom_abline(
@@ -1180,13 +1202,17 @@ cc_plot_data_sba |>
     colour = "black") +
   labs(
     x = "Cumulative % ranked by wealth (Low \u2192 High)",
-    y = "Cumulative % of skilled birth attendance") +
+    y = "Cumulative % of skilled birth attendance",
+    subtitle = "Skilled birth attendance") +
   theme_classic(base_family = "Candara", base_size = 13) +
   theme(
     panel.grid = element_blank())
 
+cc_sba
+
 ggsave(
   "./Plots/Sba_concentration_curve.png",
+  cc_sba,
   width = 7,
   height = 5,
   dpi = 500,
@@ -1195,10 +1221,45 @@ ggsave(
 ```
 
 
+```{r}
+#| label: combined-maps
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+library(patchwork)
+
+ggsave(
+  "./Plots/combined_maps.png",
+  (map_stunting | map_vaccination | map_sba),
+  width = 12,
+  height = 8,
+  dpi = 500,
+  bg = "white")
+
+```
 
 
 
+```{r}
+#| label: combined-cc-graphs
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
 
+library(patchwork)
+
+ggsave(
+  "./Plots/combined_cc_graphs.png",
+  (cc_stunting | cc_vaccination) / (cc_sba | plot_spacer()),
+  width = 14,
+  height = 10,
+  dpi = 500,
+  bg = "white")
+
+```
 
 
 
