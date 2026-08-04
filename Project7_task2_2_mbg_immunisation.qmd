@@ -24,7 +24,7 @@ Packages and data
 #| cache: false
 #| include: true
 
-rm(list = ls())
+
 pacman::p_load(
   tidyverse, haven, labelled, epiDisplay, survey,
   gtsummary, extrafont, flextable, PrevMap)
@@ -634,7 +634,7 @@ Checking for multicollinearity
 
 library(ggcorrplot)
 
-ggcorrplot(
+gg_cor_immunisation <- ggcorrplot(
   cor(
     collapsed_immunisation_data[, c(
       "age_months_cat_rec", "child_sex_rec", "parity_rec",
@@ -642,6 +642,7 @@ ggcorrplot(
         "employment_rec", "wealth_status_rec", "residence_rec")],
     use = "pairwise.complete.obs"),
   type = "lower",
+  show.legend = F,
     ggtheme = ggplot2::theme_bw(base_family = "Candara") +
          theme(panel.grid = element_blank()),
     hc.order = F,
@@ -649,6 +650,8 @@ ggcorrplot(
     outline.col = "white",
     lab = TRUE,
     legend.title = "Correlation")
+
+gg_cor_immunisation
 
 ```
 
@@ -841,7 +844,7 @@ immunisation_df_clean <- immunisation_df %>%
 par(bty = "o")
 
 
-variog <- spat.corr.diagnostic(
+variog_immunisation <- spat.corr.diagnostic(
   fully_vaccinated ~ age_months_cat_rec + child_sex_rec + 
     parity_rec + age_mother_rec + marital_status_rec +
     education_rec + employment_rec + wealth_status_rec +
@@ -851,6 +854,44 @@ variog <- spat.corr.diagnostic(
   likelihood = "Binomial",
   lse.variogram = T,
   data = immunisation_df_clean)
+
+
+
+pars   <- variog_immunisation$lse.variogram
+sigma2 <- pars["sigma^2"]
+phi    <- pars["phi"]
+nugget <- pars["tau^2"]
+
+variog_df_immunisation <- data.frame(
+  distance = variog_immunisation$distance.bins,
+  obs      = variog_immunisation$obs.variogram,
+  lower    = variog_immunisation$lower.lim,
+  upper    = variog_immunisation$upper.lim) |>
+  mutate(
+    fitted = nugget + sigma2 * (1 - exp(-distance / phi)))
+
+p_variog_immunisation <- 
+  ggplot(variog_df_immunisation, aes(x = distance)) +
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+     fill = "grey80", alpha = 0.5) +
+  geom_line(
+    aes(y = obs), color = "black", linewidth = 0.8) +
+  geom_point(
+    aes(y = obs), color = "black", size = 2) +
+  geom_line(
+    aes(y = fitted), color = "blue", 
+    linetype = "dashed", linewidth = 0.8) +
+  labs(
+    x = "Spatial distance",
+    y = "Variogram",
+    subtitle = "Full vaccination") +
+  theme_bw(base_family = "Candara", base_size = 14) + 
+  theme(
+    plot.subtitle = element_text(hjust = .5),
+    panel.grid = element_blank())
+
+p_variog_immunisation
 
 ```
 
