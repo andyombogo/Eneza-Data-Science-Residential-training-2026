@@ -52,7 +52,7 @@ try:
     c1, c2, c3 = st.columns(3)
     c1.metric("Children in cleaned sample (all ages)", f"{summary['sample']['total_children_all_ages']:,}")
     c2.metric("Survey clusters", f"{summary['sample']['total_clusters']:,}")
-    c3.metric("Stunting analysis sample (6–59mo)", f"{summary['sample']['stunting_analysis_n_6_59_months']:,}")
+    c3.metric("Stunting analysis sample (12–35mo)", f"{summary['sample']['stunting_analysis_n_12_35_months']:,}")
     st.caption(summary["source"] if "source" in summary else "KDHS 2022, Kids' Recode.")
 except Exception:
     st.info("Sample metrics unavailable — see completeness table below.")

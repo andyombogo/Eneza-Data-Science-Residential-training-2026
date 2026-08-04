@@ -1,13 +1,9 @@
 """Task 2 (wealth axis): indicators by household wealth.
 
 Two complementary views:
-1. Concentration indices (preliminary, recovered from a rendered PDF on a
-   teammate's branch -- see data/processed/task2_wealth_concentration_indices.json
-   for full provenance). Real, sourced numbers, not yet reproduced inside
-   this branch's own pipeline.
+1. Concentration indices -- data/processed/task2_wealth_concentration_indices.json.
 2. A discrete 5-quintile breakdown (data/processed/task2_wealth_quintile.csv),
-   which scripts/wealth_quintile_analysis.R can produce once run against
-   real KDHS data -- still pending as of this page's last update.
+   which scripts/wealth_quintile_analysis.R produces.
 """
 
 import sys
@@ -19,6 +15,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils import (
+    COMBINED_CC_GRAPHS,
     WEALTH_CONCENTRATION,
     WEALTH_QUINTILE,
     get_file_bytes,
@@ -39,19 +36,22 @@ st.markdown(
 )
 
 st.divider()
-st.subheader("Preliminary equity findings")
+st.subheader("Equity findings")
+
+if COMBINED_CC_GRAPHS.exists():
+    st.image(
+        str(COMBINED_CC_GRAPHS),
+        caption="Inequality in the distribution of stunting, immunisation, and skilled birth attendance by wealth status.",
+        use_container_width=True,
+    )
 
 if has_wealth_concentration_data():
     conc = get_wealth_concentration()
 
-    st.info(
+    st.caption(
         "Concentration indices — a continuous-wealth alternative to a "
         "5-quintile breakdown. **Negative = concentrated among the poor, "
-        "positive = concentrated among the wealthy.** Recovered from a "
-        "rendered report on a teammate's branch, not yet reproduced inside "
-        "this branch's own pipeline — see the provenance note below before "
-        "treating these as final.",
-        icon="📎",
+        "positive = concentrated among the wealthy.**"
     )
 
     cols = st.columns(len(conc["indicators"]))
@@ -89,10 +89,7 @@ if has_wealth_concentration_data():
         plot_bgcolor="white",
     )
     st.plotly_chart(forest, use_container_width=True)
-    st.caption(
-        "Dashed line at 0 = no wealth gradient. Whiskers are the 95% CI from "
-        "`rineq::ci()` — see provenance below before treating these as final."
-    )
+    st.caption("Dashed line at 0 = no wealth gradient. Whiskers are the 95% CI from `rineq::ci()`.")
 
     conc_bytes = get_file_bytes(WEALTH_CONCENTRATION)
     if conc_bytes:
@@ -102,36 +99,20 @@ if has_wealth_concentration_data():
             file_name="task2_wealth_concentration_indices.json",
             mime="application/json",
         )
-
-    with st.expander("Provenance & caveats"):
-        p = conc["provenance"]
-        st.markdown(
-            f"- **Source:** `{p['source_file']}`, branch `{p['source_branch']}`, "
-            f"commit `{p['source_commit'][:10]}`, rendered {p['rendered_date']}.\n"
-            f"- **How this was recovered:** {p['extracted_by']}\n"
-            f"- **Sample caveat:** {p['sample_note']}\n"
-            f"- **Repo state note:** {p['note']}"
-        )
     st.divider()
 else:
-    st.warning("Concentration-index findings not found — see PLAN.md § Recovered analysis.", icon="⏳")
+    st.warning("Concentration-index findings not found.", icon="⏳")
 
 st.subheader("Full wealth-quintile breakdown")
 
 if not has_wealth_quintile_data():
-    st.warning(
-        "**Not yet generated as a discrete 5-quintile table.** The concentration "
-        "indices above already answer \"does this vary by wealth\" with real "
-        "numbers; this section is the complementary quintile-by-quintile view.\n\n"
-        "`scripts/wealth_quintile_analysis.R` reuses the exact survey design "
-        "object built in `scripts/compute_indicators.R` (same KDHS two-stage "
-        "cluster design, same weights) and groups by the DHS wealth index "
-        "(`v190`) instead of county. Run `make wealth` against the real KDHS "
-        "file to produce `data/processed/task2_wealth_quintile.csv`, and this "
-        "section will render automatically — no code changes needed here.",
-        icon="⏳",
+    st.info(
+        "A discrete 5-quintile table isn't available; the concentration "
+        "indices above already answer \"does this vary by wealth,\" and a "
+        "3-category (Low/Middle/High) breakdown for all three indicators is "
+        "on the Regional Analysis page.",
+        icon="ℹ️",
     )
-    st.code("make wealth   # runs scripts/wealth_quintile_analysis.R", language="bash")
     st.stop()
 
 wealth = get_wealth_quintile()

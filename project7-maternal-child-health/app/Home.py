@@ -11,7 +11,14 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import get_county_stunting, get_priority_counties, get_regional_summary, page_footer
+from utils import (
+    get_county_stunting,
+    get_immunisation_summary,
+    get_priority_counties,
+    get_regional_summary,
+    get_sba_summary,
+    page_footer,
+)
 
 st.set_page_config(
     page_title="Project 7 — Maternal & Child Health in Kenya",
@@ -32,22 +39,37 @@ st.markdown(
 st.divider()
 
 summary = get_regional_summary()
+immun_summary = get_immunisation_summary()
+sba_summary = get_sba_summary()
 county = get_county_stunting()
 priority = get_priority_counties()
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric(
-    "National stunting prevalence",
+st.caption("All three indicators below: children aged 12–35 months, KDHS 2022, survey-weighted.")
+i1, i2, i3 = st.columns(3)
+i1.metric(
+    "Stunting",
     f"{summary['national']['stunting_prevalence_weighted_pct']:.1f}%",
-    help="Survey-weighted; HAZ < -2 SD, WHO 2006 growth standards. KDHS 2022.",
+    help="Height-for-age z-score (HAZ) < -2 SD, WHO 2006 growth standards. SDG 2.2.1.",
 )
-c2.metric("Counties analysed", f"{len(county):,}", help="All 47 Kenyan counties.")
-c3.metric(
-    "Highest-prevalence county",
+i2.metric(
+    "Full immunisation",
+    f"{immun_summary['national']['full_immunisation_prevalence_weighted_pct']:.1f}%",
+    help="All scheduled vaccines by the national schedule. SDG 3.b.1.",
+)
+i3.metric(
+    "Skilled birth attendance",
+    f"{sba_summary['national']['sba_prevalence_weighted_pct']:.1f}%",
+    help="Delivery assisted by a doctor, nurse, or midwife/clinical officer. SDG 3.1.2.",
+)
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Counties analysed", f"{len(county):,}", help="All 47 Kenyan counties.")
+c2.metric(
+    "Highest-stunting county (6–59mo v1 ranking)",
     county.iloc[0]["county"],
     f"{county.iloc[0]['prevalence_pct']:.1f}%",
 )
-c4.metric(
+c3.metric(
     "Priority counties flagged",
     f"{int(priority['priority'].sum())}",
     help="Counties at or above national prevalence + 1 SD across counties — see Intervention Prioritization.",
@@ -60,9 +82,9 @@ nav = [
     ("📋 Problem Statement", "Objectives and a live Task 2/4 deliverables checklist."),
     ("🗂️ Data", "Sources, access terms, and a live data-completeness check."),
     ("🧪 Methodology", "Survey design, indicator definitions, and the INLA/MBG small-area methods."),
-    ("📍 Regional Analysis", "How stunting varies across Kenya's 47 counties, with confidence intervals."),
     ("💰 Wealth Analysis", "How outcomes vary by household wealth — concentration indices and a forest plot."),
-    ("🌐 Spatial & Bayesian Analysis", "Code audit of the INLA/MBG small-area models: what exists, what's missing to run it."),
+    ("📍 Regional Analysis", "How stunting varies across Kenya's 47 counties, with confidence intervals."),
+    ("🌐 Spatial & Bayesian Analysis", "Observed prevalence, model diagnostics, and predicted probability maps for all three indicators."),
     ("🎯 Intervention Prioritization", "A ranked, threshold-based list of counties for intervention."),
     ("📋 Policy Recommendations", "What the evidence supports acting on, and what it doesn't yet."),
     ("⬇️ Downloads", "Every committed output file, downloadable, with its completeness status."),
@@ -82,12 +104,12 @@ tasks = pd.DataFrame(
         {
             "Task": "Regional & wealth-quintile indicators (Task 2)",
             "Owners": "Kevinson Mwangi, Elphas Abok",
-            "Status": "🟡 Stunting: national + county done. Immunisation, skilled birth attendance, wealth quintile: pending.",
+            "Status": "🟢 Complete — stunting, immunisation, and SBA analysed nationally, regionally, and by wealth (12–35 months).",
         },
         {
             "Task": "Intervention prioritization (Task 4)",
             "Owners": "John Andrew, Kevinson Mwangi, Elphas Abok",
-            "Status": "🟢 v1 live: county ranking from stunting data. Refinement pending wealth/immunisation/SBA data.",
+            "Status": "🟢 Complete — v1 (stunting-based county ranking) and v2 (multi-indicator vulnerability ranking) both live.",
         },
     ]
 ).set_index("Task")

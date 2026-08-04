@@ -1,5 +1,18 @@
 # Task 2 Audit & Implementation Report
 
+> **Update, 2026-08-04:** several items this report marked as blocked are
+> now resolved — `origin/task2-regional-indicators` gained real *rendered*
+> outputs (not just source), including `Presentation.Rmd`, a consolidated
+> `MCH_Kenya_Task2_Task4_Pipeline.qmd`, and `Plots/`/`figures/` images. The
+> team standardized all three indicators on a **12–35 month** age band and
+> ran the MBG/INLA models (diagnostics and predictions now on the Spatial &
+> Bayesian Analysis page). National prevalence for all three indicators is
+> now in-app (21.7% / 50.3% / 88.8%). See `PLAN.md` § App update
+> (2026-08-04) for the full rundown, including what's still open (the v1
+> stunting ranking still runs on the earlier 6–59mo county data — no exact
+> 12–35mo county CSV exists yet, only images). The gap analysis below is
+> left as a historical record of the 2026-08-03 audit, not updated in place.
+
 **Date:** 2026-08-03
 **Scope:** Full audit of Task 2 (regional & wealth-quintile indicators) against
 the requirements stated on the deployed app's

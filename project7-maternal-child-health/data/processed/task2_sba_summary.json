@@ -1,0 +1,21 @@
+{
+  "source": "Kenya Demographic and Health Survey (KDHS) 2022, Kids' Recode (KR) file",
+  "source_access": "restricted -- obtained via an approved data request to The DHS Program (dhsprogram.com); the raw microdata file is not redistributable and is not committed to this repository",
+  "analysis_author": "Kevinson Mwangi, Elphas Abok",
+  "analysis_source_file": "Project7_task2.qmd / MCH_Kenya_Task2_Task4_Pipeline.qmd",
+  "age_band": "12-35 months",
+  "extracted_from": "national prevalence read from the annotated reference line in Plots/Sba_forest_plot.png (origin/task2-regional-indicators, rendered by Project7_task2.qmd), 2026-08-04.",
+  "methodology": "Skilled birth attendance defined as a delivery assisted by a doctor, nurse, or midwife/clinical officer (KDHS 2022 variables m3a, m3b) -- the standard DHS/WHO definition. Traditional birth attendants, relatives, and other unskilled providers are not classified as skilled. Estimates are survey-weighted (v005) and account for the two-stage cluster sample design (primary sampling unit = v021, strata = v022).",
+  "national": {
+    "sba_prevalence_weighted_pct": 88.8,
+    "sba_prevalence_ci": null,
+    "sba_prevalence_ci_note": "not stated in the recovered source; the forest-plot reference line gives the point estimate only"
+  },
+  "subnational": {
+    "status": "recovered (12-35 month band), not yet reproduced as a discrete CSV in this branch's own pipeline",
+    "county_forest_plot_png": "Plots/Sba_forest_plot.png",
+    "county_map_png": "Plots/Sba_map.png",
+    "county_rows": 47,
+    "note": "No county-level SBA CSV exists in this repo -- the recovered forest plot / map images are the only county-level view available."
+  }
+}

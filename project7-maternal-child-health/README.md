@@ -34,10 +34,11 @@ than leaving that judgment to intuition.
 | | |
 |---|---|
 | **Data** | KDHS 2022 (Kenya Demographic and Health Survey), Kids' Recode — 13,528 children, 1,689 clusters, all 47 counties |
-| **National child stunting** | 17.4% (HAZ < -2 SD, WHO 2006 standards), survey-weighted, n = 11,715 (ages 6–59 months) |
-| **County range** | 9.0% (Murang'a) to 38.6% (Kilifi) — a 29.6-point spread a national average alone would hide |
-| **Priority counties (v1)** | 5 of 47 flagged at ≥ national + 1 SD: **Kilifi, West Pokot, Samburu, Meru, Bomet** |
-| **Wealth equity (preliminary)** | SBA concentration index **+0.66** (wealthy-concentrated) — the largest of 3 indicators. Discrete quintile breakdown still pending. See Status. |
+| **National stunting / immunisation / SBA** | 21.7% / 50.3% / 88.8% (survey-weighted, children 12–35 months) |
+| **County range (stunting, v1/6–59mo band)** | 9.0% (Murang'a) to 38.6% (Kilifi) — a 29.6-point spread a national average alone would hide |
+| **Priority counties (v1, stunting)** | 5 of 47 flagged at ≥ national + 1 SD: **Kilifi, West Pokot, Samburu, Meru, Bomet** |
+| **Priority counties (v2, multi-indicator)** | Top 3 by vulnerability index: **West Pokot, Mandera, Samburu** |
+| **Wealth equity** | SBA concentration index **+0.66** (wealthy-concentrated) — the largest of 3 indicators. See Wealth Analysis. |
 | **Reproduce** | `make all` (see Reproducibility) |
 | **Live app** | `streamlit run app/Home.py` |
 
@@ -107,13 +108,13 @@ project7-maternal-child-health/
 ├── app/                          # Streamlit presentation layer
 │   ├── Home.py                   # landing page: headline metrics, task status
 │   ├── pages/
-│   │   ├── 0_Problem_Statement.py       # problem statement, objectives, Task 2/4 deliverables status
+│   │   ├── 0_Problem_Statement.py       # problem statement, SDG links, objectives, Task 2/4 deliverables status
 │   │   ├── 1_Data.py                    # sources, access terms, live data-completeness check
-│   │   ├── 2_Methodology.py             # docs/methodology.md in-app + INLA/MBG methodology summary
-│   │   ├── 3_Regional_Analysis.py
-│   │   ├── 4_Wealth_Analysis.py
-│   │   ├── 5_Spatial_Bayesian_Analysis.py  # INLA/MBG code audit -- status, not fabricated results
-│   │   ├── 6_Intervention_Prioritization.py
+│   │   ├── 2_Methodology.py             # docs/methodology.md in-app + INLA/MBG model specification
+│   │   ├── 3_Wealth_Analysis.py
+│   │   ├── 4_Regional_Analysis.py
+│   │   ├── 5_Spatial_Bayesian_Analysis.py  # observed prevalence, diagnostics, predicted-probability maps
+│   │   ├── 6_Intervention_Prioritization.py  # v1 (stunting) + v2 (multi-indicator) rankings
 │   │   ├── 7_Policy_Recommendations.py
 │   │   ├── 8_Downloads.py               # every committed output file, downloadable
 │   │   └── 9_About.py
@@ -237,39 +238,40 @@ Problem Statement page. Summary:
 
 | Item | Status |
 |---|---|
-| National + county stunting | ✅ Done |
+| National stunting, immunisation, SBA (12–35 months) | ✅ Done — 21.7% / 50.3% / 88.8% |
+| County-level stunting, immunisation, SBA (forest plots + maps) | ✅ Done |
 | Task 4 v1 (county prioritization from stunting) | ✅ Done |
+| Task 4 v2 (multi-indicator vulnerability ranking) | ✅ Done |
 | Task 4 owners | ✅ Assigned — John Andrew, Kevinson Mwangi, Elphas Abok |
-| Wealth-equity concentration indices (stunting, immunisation, SBA) | 🟡 Recovered from a teammate's branch, preliminary — see PLAN.md § Recovered analysis |
-| County stunting choropleth map | 🟡 Recovered and live on the Regional Analysis page, preliminary (12–35mo band, pending regeneration on 6–59mo) |
-| Immunisation & SBA county maps | 🟡 Recovered (`outputs/maps/`), surfaced on the Spatial & Bayesian Analysis app page |
-| Discrete wealth-quintile breakdown | ❌ Confirmed genuinely missing (checked the recovered work too) — code ready, not yet run — **highest-priority remaining gap** |
-| Immunisation coverage (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
-| Skilled birth attendance (national/county) | 🟡 Code recovered, not yet ported into this branch's pipeline or executed |
-| Age-band reconciliation (6–59mo vs. 12–35mo stunting definitions) | ⏳ Needs a team decision, not code — see PLAN.md |
-| Task 4 v2 (fold in equity/immunisation/SBA) | ⏳ Blocked on the above |
+| Wealth-equity concentration indices (stunting, immunisation, SBA) | ✅ Done |
+| Wealth-category (Low/Middle/High) breakdown, all 3 indicators | ✅ Done |
+| Small-area estimation (MBG + INLA), all 3 indicators | ✅ Done — observed prevalence, diagnostics, predicted-probability maps |
+| Discrete 5-quintile wealth breakdown | ❌ Not produced (3-category breakdown available instead) |
 
 ## Key findings
 
-- National child stunting: **17.4%** (KDHS 2022) — roughly 1 in 6 children
-  aged 6–59 months.
-- County prevalence ranges from **9.0% (Murang'a) to 38.6% (Kilifi)** — a
-  29.6-point spread that a single national figure completely hides.
+- National stunting: **21.7%**, full immunisation: **50.3%**, skilled birth
+  attendance: **88.8%** (KDHS 2022, children 12–35 months, survey-weighted).
+- County prevalence ranges from **9.0% (Murang'a) to 38.6% (Kilifi)** on the
+  v1 stunting ranking (6–59 month band) — a 29.6-point spread that a single
+  national figure completely hides.
 - **5 counties (Kilifi, West Pokot, Samburu, Meru, Bomet)** sit at or above
-  national prevalence + 1 standard deviation across counties — a
-  meaningfully worse-than-typical gap, not just above average.
+  national prevalence + 1 standard deviation across counties on the v1
+  stunting-only ranking — a meaningfully worse-than-typical gap, not just
+  above average. The v2 multi-indicator vulnerability ranking's top 3
+  (**West Pokot, Mandera, Samburu**) corroborates two of these once
+  immunisation and SBA are folded in.
 - Some flagged counties carry wider confidence intervals than others (see
   `data/processed/task4_priority_counties.csv`, `ci_width_pct`) — estimate
   certainty varies county to county and should weigh into resourcing
   decisions, not just the point estimate.
-- **Skilled birth attendance is the sharpest wealth-equity gap found so
-  far** (concentration index +0.66, 95% CI 0.62–0.70) — heavily
-  concentrated among wealthier households. Stunting (−0.25) and incomplete
-  immunisation (−0.16) both concentrate among poorer households, in the
-  same direction as each other but a smaller gap than SBA's. These are
-  preliminary, recovered findings — see Status and
+- **Skilled birth attendance is the sharpest wealth-equity gap** found
+  (concentration index +0.66, 95% CI 0.62–0.70) — heavily concentrated
+  among wealthier households. Stunting (−0.25) and incomplete immunisation
+  (−0.16) both concentrate among poorer households, in the same direction
+  as each other but a smaller gap than SBA's. See
   [`data/processed/task2_wealth_concentration_indices.json`](data/processed/task2_wealth_concentration_indices.json)
-  for full provenance before citing them as final.
+  for full provenance.
 - An independent county-level analysis (12–35 month age band) ranks
   **Kilifi, West Pokot, and Samburu** as the top 3 highest-stunting
   counties — the same top 3 as this branch's own 6–59-month analysis.

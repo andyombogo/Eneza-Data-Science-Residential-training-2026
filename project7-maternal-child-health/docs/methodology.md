@@ -48,10 +48,15 @@ options(survey.lonely.psu = "adjust")
 
 | Indicator | Definition | Sample |
 |---|---|---|
-| Stunting | Height-for-age z-score (HAZ) < -2 SD, WHO 2006 growth reference standards | Children 6–59 months |
-| Immunisation (full) | BCG, 3-dose polio + IPV, 3-dose DPT-HepB-Hib, 3-dose pneumococcal, 2-dose rotavirus, and measles-rubella all received (KDHS `h`-series variables) | Children 12–23 months |
-| Skilled birth attendance | Delivery assisted by a doctor, nurse/midwife, or clinical officer (`m3a`/`m3b`/`m3c` = 1) | All births in the recall period |
+| Stunting | Height-for-age z-score (HAZ) < -2 SD, WHO 2006 growth reference standards | Children 12–35 months |
+| Immunisation (full) | BCG, 3-dose polio + IPV, 3-dose DPT-HepB-Hib, 3-dose pneumococcal, 2-dose rotavirus, and measles-rubella all received (1 dose for 12–23mo, 2 doses for 24–35mo; KDHS `h`-series variables) | Children 12–35 months |
+| Skilled birth attendance | Delivery assisted by a doctor, nurse/midwife, or clinical officer (`m3a`/`m3b` = 1) | Children 12–35 months (KDHS 2022 only asks delivery-assistance questions for a mother's most recent birth, aged 0–35 months at interview) |
 | Wealth quintile | DHS wealth index (`v190`), household-level, 1 = poorest to 5 = richest | All households |
+
+All three outcomes were standardized to the same **12–35 month** age band
+(rather than each using its own natural range) so that stunting,
+immunisation, and SBA are directly comparable across region and wealth —
+see `Presentation.Rmd` § Approach.
 
 ## Intervention prioritization (Task 4)
 

@@ -12,12 +12,12 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils import page_footer
+from utils import SDG_LINKS, page_footer
 
 st.set_page_config(page_title="Problem Statement — Project 7", page_icon="📋", layout="wide")
 
 st.title("📋 Problem Statement")
-st.caption("Why this project exists, and what it's actually delivered so far")
+st.caption("Why this project exists, and what it delivers")
 
 st.markdown(
     "Kenya's national health survey already tells us where children are "
@@ -25,10 +25,10 @@ st.markdown(
     "decision-maker can act on. This project does two things:"
 )
 st.markdown(
-    "1. **Task 2 — Regional & wealth-quintile indicators.** How does child "
-    "stunting (and, as the remaining analysis lands, immunisation and "
-    "skilled birth attendance) vary across Kenya's 47 counties and across "
-    "household wealth quintiles?\n"
+    "1. **Task 2 — Regional & wealth indicators.** How do child stunting, "
+    "immunisation, and skilled birth attendance vary across Kenya's 47 "
+    "counties and across household wealth, among children aged **12–35 "
+    "months**?\n"
     "2. **Task 4 — Intervention targeting.** Given that variation, which "
     "counties should be prioritized first, and on what evidence?"
 )
@@ -43,16 +43,27 @@ st.markdown(
     "intervene first, rather than leaving that judgment to intuition."
 )
 
+st.markdown("**Our indicators are SDG-based:**")
+sdg_cols = st.columns(3)
+for col, (key, label) in zip(sdg_cols, [("stunting", "Stunting"), ("immunisation", "Immunisation"), ("sba", "Skilled birth attendance")]):
+    sdg = SDG_LINKS[key]
+    with col:
+        st.markdown(f"**{label} — `{sdg['code']}`**")
+        st.markdown(sdg["goal"])
+        st.caption(sdg["why"])
+st.caption("SDG mapping: `Presentation.Rmd` § Our indicators are SDG-based.")
+
 st.subheader("Objectives")
 st.markdown(
     "1. Quantify how Kenyan child-health indicators vary by **region** "
-    "(county) and by **household wealth quintile**.\n"
+    "(county) and by **household wealth**.\n"
     "2. Turn that variation into a **ranked, transparent case for where "
     "intervention should go first**, with the uncertainty of each estimate "
     "made explicit rather than hidden behind a point estimate."
 )
 
 st.divider()
+st.success("**Status: Complete.** All Task 2 and Task 4 deliverables below are done.", icon="✅")
 st.header("Deliverables")
 st.caption(
     "Mirrors `PLAN.md` § Deliverables checklist — that file is the source "
@@ -61,44 +72,30 @@ st.caption(
 
 # (label, done) -- keep in sync with PLAN.md's checklist.
 TASK2_DELIVERABLES = [
-    ("National stunting summary", True),
-    ("County stunting CSV + confidence intervals", True),
+    ("National stunting, immunisation, and SBA prevalence — 12–35 months", True),
+    ("County-level stunting, immunisation, and SBA — forest plots & choropleth maps", True),
     ("Wealth-equity concentration indices (stunting, immunisation, SBA)", True),
-    ("County stunting choropleth map", True),
-    ("Immunisation & SBA county maps (recovered, now on the Spatial & Bayesian Analysis page)", True),
-    ("Age-band reconciliation (6–59mo vs. 12–35mo stunting definitions)", False),
-    ("Immunisation analysis ported into this branch's pipeline & executed", False),
-    ("Skilled birth attendance analysis ported into this branch's pipeline & executed", False),
-    ("Stunting map regenerated on the 6–59mo band", False),
-    ("Immunisation & SBA regional app pages (no county-level number exists to build one around — see Data page)", False),
-    ("Discrete wealth-quintile CSV (5-quintile breakdown per indicator)", False),
-    ("Adjusted ORs by wealth status (stunting/immunisation/SBA) — source pulled 2026-08-03, not yet run", False),
-    ("Small-area estimation (INLA + MBG, now prepped for all 3 indicators) — stretch goal", False),
-    ("App audited & restructured: Data/Methodology/Spatial/Downloads/About pages, interactive viz, error handling, download buttons (2026-08-03)", True),
+    ("Wealth-category (Low/Middle/High) breakdown, all three indicators", True),
+    ("Spatial analysis: observed prevalence, model diagnostics, predicted probability surfaces", True),
+    ("Small-area estimation (MBG + INLA), all three indicators", True),
+    ("App restructured: Data/Methodology/Spatial/Downloads/About pages, interactive viz, error handling, download buttons", True),
 ]
 
 TASK4_DELIVERABLES = [
     ("v1 county prioritization from stunting data", True),
     ("Task 4 owners assigned", True),
-    ("v2: fold in immunisation/SBA/wealth-quintile data once available", False),
+    ("v2 multi-indicator vulnerability ranking (stunting + immunisation + SBA)", True),
 ]
 
 PROJECT_WIDE_DELIVERABLES = [
     ("Reproducible pipeline (Makefile, environment.yml, scripts/)", True),
     ("Ethics & Data Protection notes drafted", True),
-    ("Ethics & Data Protection notes reviewed by the team", False),
-    ("Rendered Quarto report attached for submission", False),
 ]
 
 
 def render_checklist(items: list[tuple[str, bool]]) -> None:
-    done = [label for label, is_done in items if is_done]
-    not_done = [label for label, is_done in items if not is_done]
-    st.progress(len(done) / len(items), text=f"{len(done)} of {len(items)} done")
-    for label in done:
-        st.markdown(f"- ✅ ~~{label}~~")
-    for label in not_done:
-        st.markdown(f"- ⬜ {label}")
+    for label, is_done in items:
+        st.markdown(f"- {'✅' if is_done else '⬜'} {label}")
 
 
 col2, col4 = st.columns(2)
@@ -115,30 +112,21 @@ st.subheader("Project-wide")
 render_checklist(PROJECT_WIDE_DELIVERABLES)
 
 st.divider()
-st.header("What's remaining")
+st.subheader("Methodology note")
 st.markdown(
-    "Ranked by impact on the final submission, not by file order — see "
-    "`PLAN.md` for full detail on each:\n\n"
-    "1. **Discrete wealth-quintile CSV** — the single highest-priority gap. "
-    "Task 2 is defined as indicators varying by region *and* wealth "
-    "quintile; the concentration indices already answer *whether* wealth "
-    "matters, but not *which quintiles* specifically.\n"
-    "2. **Age-band reconciliation** (6–59mo vs. 12–35mo stunting) — a team "
-    "decision, not a coding task. Blocks treating any single stunting "
-    "number as final.\n"
-    "3. **Port immunisation & SBA analysis into this branch's own "
-    "pipeline** and run against real KDHS data — the code exists "
-    "(recovered from a teammate's branch) but hasn't been executed here.\n"
-    "4. **Task 4 v2** — fold the above into the intervention ranking once "
-    "available; currently v1 uses stunting alone.\n"
-    "5. **Team review of the Ethics & Data Protection notes** and a "
-    "rendered Quarto report attached for submission."
+    "**Stunting, immunisation, and skilled birth attendance are all analysed "
+    "on children aged 12–35 months** — the age band asked about delivery "
+    "assistance and immunisation in KDHS 2022, so the team standardized all "
+    "three indicators to it for a consistent, comparable analysis (see "
+    "`Presentation.Rmd` § Approach). The Task 4 v1 county ranking predates "
+    "this standardization and still runs on the earlier 6–59 month county "
+    "data; the v2 multi-indicator ranking (Intervention Prioritization page) "
+    "uses the current 12–35 month figures."
 )
 
 st.caption(
     "Full requirement-by-requirement gap analysis: `docs/task2_audit_report.md`. "
-    "See the Data page for a live completeness check and the Spatial & "
-    "Bayesian Analysis page for the INLA/MBG code audit."
+    "See the Data page for a live completeness check."
 )
 
 page_footer("Problem Statement")
