@@ -789,7 +789,7 @@ variog_df_sba <- data.frame(
 
 
 p_variog_sba <- 
-  ggplot(variog_df_sba, aes(x = distance)) +
+  ggplot(variog_df_sba, aes(x = distance/1000)) +
   geom_ribbon(
     aes(ymin = lower, ymax = upper),
      fill = "grey80", alpha = 0.5) +
