@@ -24,7 +24,6 @@ Packages and data
 #| cache: false
 #| include: true
 
-rm(list = ls())
 pacman::p_load(
   tidyverse, haven, labelled, epiDisplay, survey,
   gtsummary, extrafont, flextable, PrevMap)
@@ -555,19 +554,22 @@ Checking for multicollinearity
 
 library(ggcorrplot)
 
-ggcorrplot(
+gg_cor_sba <- ggcorrplot(
   cor(
     collapsed_sba_data[, c(
       "parity_rec", "age_mother_rec", "marital_status_rec", "education_rec", "employment_rec", "wealth_status_rec", "residence_rec")],
     use = "pairwise.complete.obs"),
   type = "lower",
-    ggtheme = ggplot2::theme_bw(base_family = "Candara") +
+  show.legend = F, 
+  ggtheme = ggplot2::theme_bw(base_family = "Candara") +
          theme(panel.grid = element_blank()),
     hc.order = F,
     show.diag = F,
     outline.col = "white",
     lab = TRUE,
     legend.title = "Correlation")
+
+gg_cor_sba 
 
 ```
 
@@ -760,7 +762,7 @@ sba_df_clean <- sba_df %>%
 par(bty = "o")
 
 
-variog <- spat.corr.diagnostic(
+variog_sba <- spat.corr.diagnostic(
   sba ~  
     parity_rec + age_mother_rec + marital_status_rec +
     education_rec + employment_rec + wealth_status_rec +
@@ -770,6 +772,45 @@ variog <- spat.corr.diagnostic(
   likelihood = "Binomial",
   lse.variogram = T,
   data = sba_df_clean)
+
+
+pars   <- variog_sba$lse.variogram
+sigma2 <- pars["sigma^2"]
+phi    <- pars["phi"]
+nugget <- pars["tau^2"]
+
+variog_df_sba <- data.frame(
+  distance = variog_sba$distance.bins,
+  obs      = variog_sba$obs.variogram,
+  lower    = variog_sba$lower.lim,
+  upper    = variog_sba$upper.lim) |>
+  mutate(
+    fitted = nugget + sigma2 * (1 - exp(-distance / phi)))
+
+
+p_variog_sba <- 
+  ggplot(variog_df_sba, aes(x = distance)) +
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+     fill = "grey80", alpha = 0.5) +
+  geom_line(
+    aes(y = obs), color = "black", linewidth = 0.8) +
+  geom_point(
+    aes(y = obs), color = "black", size = 2) +
+  geom_line(
+    aes(y = fitted), color = "blue", 
+    linetype = "dashed", linewidth = 0.8) +
+  labs(
+    x = "Spatial distance",
+    y = "Variogram",
+    subtitle = "Skilled birth attendace") +
+  theme_bw(base_family = "Candara", base_size = 14) + 
+  theme(
+    plot.subtitle = element_text(hjust = .5),
+    panel.grid = element_blank())
+
+p_variog_sba
+
 
 ```
 
@@ -808,3 +849,36 @@ set.seed(123)
 
 ```
 
+## Combining the graphs
+
+```{r}
+#| label: combined-graphs
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+## Correlation plots
+
+library(patchwork)
+
+ggsave(
+  "./Plots/combined_correlation_plots.png",
+  (gg_cor_stunting | gg_cor_immunisation) / (gg_cor_sba | plot_spacer()),
+  width = 10,
+  height = 10, 
+  dpi = 500,
+  bg = "white")
+
+## Variograms plots
+
+ggsave(
+  "./Plots/combined_variograms_plots.png",
+  (p_variog_stunting | p_variog_immunisation) / (p_variog_sba | plot_spacer()),
+  width = 10,
+  height = 10, 
+  dpi = 500,
+  bg = "white")
+
+
+```
