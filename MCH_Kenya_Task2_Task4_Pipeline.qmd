@@ -21,7 +21,7 @@ This file merges three source scripts into ONE pipeline that is scoped
 strictly to what the project's own PLAN.md / problem statement asks for:
 
   1. Project7_task2__2_.qmd        -> the original stunting/immunisation/SBA
-                                       descriptive analysis ("mate's" script).
+                                       descriptive analysis.
   2. MCH_Integrated_Pipeline.qmd   -> the 17-phase pipeline that already
                                        merged (1) plus equity indices, spatial
                                        analysis, a vulnerability index and a
@@ -33,47 +33,7 @@ strictly to what the project's own PLAN.md / problem statement asks for:
                                        area estimation script (Task 2's
                                        "stretch goal" checklist item).
 
-WHAT WAS KEPT: every phase that produces a Task 2 or Task 4 deliverable
-(national summary, county estimates + CI, wealth-quintile breakdown,
-concentration/SII/RII equity indices, choropleth + LISA cluster maps, the
-INLA small-area surface, the vulnerability index and county priority
-ranking).
 
-WHAT WAS REMOVED: Phase 15/15b of MCH_Integrated_Pipeline.qmd — the maternal
--risk classifier (tidymodels/ranger/xgboost/SMOTE/fairness audit). It runs on
-a separate individual-level clinical dataset (Age/BP/BS/BodyTemp/HeartRate)
-that has nothing to do with KDHS county- or wealth-level child-health
-indicators, and it is not listed anywhere in the Task 2 / Task 4 deliverables
-checklist. Keeping it in "one pipeline" would mix two unrelated data
-products under a single report. Phase 16/17 (recommendations, ethics) were
-trimmed to match — they no longer reference the classifier's fairness/
-calibration output.
-
-WHAT WAS ADDED to close the open checklist items:
-  - PHASE 6/11 : `wealth_3cat_f` (Low/Middle/High) is the SOLE wealth
-    breakdown shown in every wealth-related plot and table (violin, KDE,
-    distribution bar chart, discrete wealth-category CSV, the trend line
-    chart, and the adjusted-OR regression) — matches the mate's later-branch
-    convention exactly. The 5-quintile `wealth_q_f`/`wealth_q` variables are
-    kept ONLY where the method requires a continuous or fine-grained input
-    that a 3-category collapse would break: `wealth_cont` for concentration
-    curves/SII-RII (a rank-based method needs the finer gradient to compute
-    a meaningful curve) and the raw `wealth_q` DHS code for record-keeping.
-  - PHASE 7 : age band reverted to the mate's exact 12-35 months for ALL
-    THREE outcomes (was briefly 6-59mo for stunting only, in an earlier
-    draft of this pipeline — reverted per instruction; nothing beyond
-    35 months is included anywhere).
-  - PHASE 9 : discrete 5-quintile CSV per indicator (was previously only
-    continuous wealth_cont was used for concentration curves/SII/RII).
-  - PHASE 12B: the INLA small-area estimation script, wired in as an
-    optional phase (it needs a separate geocoded DHS cluster file that the
-    KR recode alone does not contain).
-  - PHASE 14 : Task 4 v2 — folds immunisation, SBA, *and* a wealth-quintile
-    poverty-concentration term into the composite priority index, and keeps
-    the original stunting-only v1 ranking alongside it for comparison.
-    The adjusted-OR regression itself (Phase 11.0) is computed inside this
-    pipeline via `svyglm()`, rather than read from an external CSV the
-    mate's script assumed existed — keeps the file reproducible end-to-end.
 -->
 
 # Orientation — how this file maps to the deliverables checklist
