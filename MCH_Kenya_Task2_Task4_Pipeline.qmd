@@ -1,0 +1,2105 @@
+---
+title: "Kenya Maternal & Child Health Equity Analysis — Task 2 & Task 4 Integrated Pipeline"
+subtitle: "Regional & wealth-quintile indicators (Task 2) and intervention targeting (Task 4)"
+author: "Elphas Abok, Kevinson Mwangi" 
+date: "today"
+date-format: "DD MMMM YYYY"
+format:
+  html:
+    citeproc: true
+    toc: true
+    toc-depth: 3
+    number-sections: true
+editor_options:
+  chunk_output_type: console
+---
+
+<!--
+INTEGRATION NOTE — read once, then delete.
+
+This file merges three source scripts into ONE pipeline that is scoped
+strictly to what the project's own PLAN.md / problem statement asks for:
+
+  1. Project7_task2__2_.qmd        -> the original stunting/immunisation/SBA
+                                       descriptive analysis ("mate's" script).
+  2. MCH_Integrated_Pipeline.qmd   -> the 17-phase pipeline that already
+                                       merged (1) plus equity indices, spatial
+                                       analysis, a vulnerability index and a
+                                       priority-ranking (Task 4 v1/v2), PLUS an
+                                       unrelated Phase 15/15b maternal-risk
+                                       classifier trained on a completely
+                                       different clinical dataset.
+  3. Project7_task2_inla.qmd       -> the Bayesian spatial (SPDE/INLA) small-
+                                       area estimation script (Task 2's
+                                       "stretch goal" checklist item).
+
+WHAT WAS KEPT: every phase that produces a Task 2 or Task 4 deliverable
+(national summary, county estimates + CI, wealth-quintile breakdown,
+concentration/SII/RII equity indices, choropleth + LISA cluster maps, the
+INLA small-area surface, the vulnerability index and county priority
+ranking).
+
+WHAT WAS REMOVED: Phase 15/15b of MCH_Integrated_Pipeline.qmd — the maternal
+-risk classifier (tidymodels/ranger/xgboost/SMOTE/fairness audit). It runs on
+a separate individual-level clinical dataset (Age/BP/BS/BodyTemp/HeartRate)
+that has nothing to do with KDHS county- or wealth-level child-health
+indicators, and it is not listed anywhere in the Task 2 / Task 4 deliverables
+checklist. Keeping it in "one pipeline" would mix two unrelated data
+products under a single report. Phase 16/17 (recommendations, ethics) were
+trimmed to match — they no longer reference the classifier's fairness/
+calibration output.
+
+WHAT WAS ADDED to close the open checklist items:
+  - PHASE 6/11 : `wealth_3cat_f` (Low/Middle/High) is the SOLE wealth
+    breakdown shown in every wealth-related plot and table (violin, KDE,
+    distribution bar chart, discrete wealth-category CSV, the trend line
+    chart, and the adjusted-OR regression) — matches the mate's later-branch
+    convention exactly. The 5-quintile `wealth_q_f`/`wealth_q` variables are
+    kept ONLY where the method requires a continuous or fine-grained input
+    that a 3-category collapse would break: `wealth_cont` for concentration
+    curves/SII-RII (a rank-based method needs the finer gradient to compute
+    a meaningful curve) and the raw `wealth_q` DHS code for record-keeping.
+  - PHASE 7 : age band reverted to the mate's exact 12-35 months for ALL
+    THREE outcomes (was briefly 6-59mo for stunting only, in an earlier
+    draft of this pipeline — reverted per instruction; nothing beyond
+    35 months is included anywhere).
+  - PHASE 9 : discrete 5-quintile CSV per indicator (was previously only
+    continuous wealth_cont was used for concentration curves/SII/RII).
+  - PHASE 12B: the INLA small-area estimation script, wired in as an
+    optional phase (it needs a separate geocoded DHS cluster file that the
+    KR recode alone does not contain).
+  - PHASE 14 : Task 4 v2 — folds immunisation, SBA, *and* a wealth-quintile
+    poverty-concentration term into the composite priority index, and keeps
+    the original stunting-only v1 ranking alongside it for comparison.
+    The adjusted-OR regression itself (Phase 11.0) is computed inside this
+    pipeline via `svyglm()`, rather than read from an external CSV the
+    mate's script assumed existed — keeps the file reproducible end-to-end.
+-->
+
+# Orientation — how this file maps to the deliverables checklist
+
+| Phase | Deliverable | Task |
+|---|---|---|
+| 1–5   | Reproducible pipeline, data acquisition, metadata, indicator selection, quality audit | Project-wide |
+| 6–7   | Cleaning, segmentation (12-35mo for all three outcomes) | Task 2 |
+| 8     | Expanded EDA | Task 2 |
+| 9     | National/county/residence/education indicators **+ discrete wealth-category CSV (Low/Middle/High)** | Task 2 |
+| 10    | Survey-weighted association tests | Task 2 |
+| 11    | Concentration curves + wealth-adjusted OR (Low/Middle/High) + SII/RII | Task 2 |
+| 12    | County choropleths (stunting regenerated on 12-35mo) + Moran's I/LISA | Task 2 |
+| 12B   | Small-area estimation (INLA) — stretch goal | Task 2 |
+| 13    | MCH Vulnerability Index | Task 4 |
+| 14    | Priority ranking v1 (stunting only) and **v2** (multi-indicator + wealth) | Task 4 |
+| 15    | Policy recommendations | Task 4 |
+| 16    | Ethics, limitations, reproducibility | Project-wide |
+
+## PHASE 1 — Project planning & reproducibility
+
+```{r}
+#| label: phase1-setup
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+rm(list = ls())
+
+# Prevent scientific notation; make lonely-PSU strata behave under svydesign()
+options(scipen = 999)
+options(survey.lonely.psu = "adjust")
+
+project_name <- "Kenya Maternal and Child Health Equity Analysis"
+project_year <- 2022
+
+# Output folders — every downstream phase writes only into these, so the
+# whole run is traceable without re-deriving anything from raw data.
+dir.create("Outputs", showWarnings = FALSE)
+dir.create("Outputs/Tables", showWarnings = FALSE)
+dir.create("Outputs/Figures", showWarnings = FALSE)
+dir.create("Outputs/Models", showWarnings = FALSE)
+dir.create("Data/Derived_data", showWarnings = FALSE, recursive = TRUE)
+dir.create("Plots", showWarnings = FALSE)
+
+# Packages
+# NOTE: rKenyaCensus is not on CRAN — install once via:
+#   remotes::install_github("Shelmith-Kariuki/rKenyaCensus")
+# It is a pure data package (no compiled code), so Rtools is NOT required.
+pacman::p_load(
+  tidyverse, haven, labelled, epiDisplay, survey,
+  gtsummary, extrafont, flextable, sf, rineq, janitor, spdep)
+
+message("Phase 1 setup completed successfully.")
+```
+
+## PHASE 2 — Data acquisition
+
+```{r}
+#| label: phase2-data-acquisition
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Point this at your local KDHS 2022 KR (children's) recode.
+# Point this at your local KDHS 2022 KR (children's) recode.
+kr_file <- "C:/Users/ADMIN/Downloads/KEKR8BDT-20260728T080156Z-1-001/KEKR8BDT/KEKR8BFL.DTA"
+stopifnot(file.exists(kr_file))
+
+df_raw <- read_dta(kr_file)
+
+dim(df_raw)
+```
+
+Source: KDHS 2022 KR (children's) recode. Sampling design: two-stage cluster
+sample, strata = `v022`, PSU = `v021`, sample weight = `v005 / 1e6`.
+
+## PHASE 3 — Metadata exploration
+
+```{r}
+#| label: phase3-metadata
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+variable_dictionary <- tibble(
+  variable = names(df_raw),
+  label    = sapply(df_raw, function(x) attr(x, "label")) |> unlist() |> as.character(),
+  n_missing = sapply(df_raw, function(x) sum(is.na(x))),
+  pct_missing = round(100 * n_missing / nrow(df_raw), 2)
+)
+
+write_csv(variable_dictionary, "Outputs/Tables/variable_dictionary.csv")
+```
+
+## PHASE 4 — Indicator selection
+
+```{r}
+#| label: phase4-indicator-selection
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Only the variables the three outcomes + equity dimensions need
+indicator_vars <- c(
+  # design
+  "v001", "v002", "v003", "v005", "v008", "v021", "v022",
+  # child
+  "b3", "b5", "b9", "bidx", "hw70",
+  # immunisation
+  "h0", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9", "h9a",
+  "h54", "h55", "h56", "h57", "h58", "h60",
+  # birth attendance
+  "m3a", "m3b",
+  # equity dimensions (region, wealth, residence, education)
+  "v190", "v191", "v024", "v025", "v106", "v107")
+
+master_indicator_table <- tibble(variable = indicator_vars) |>
+  left_join(variable_dictionary, by = "variable")
+
+write_csv(master_indicator_table, "Outputs/Tables/master_indicator_table.csv")
+
+master_df <- df_raw |> select(all_of(indicator_vars))
+```
+
+## PHASE 5 — Data quality audit
+
+```{r}
+#| label: phase5-quality-audit
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# 5.1 Missingness by variable
+missingness_report <- master_df |>
+  summarise(across(everything(), ~ round(100 * mean(is.na(.)), 2))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "pct_missing") |>
+  arrange(desc(pct_missing))
+
+# 5.2 Duplicates (household/child level)
+n_duplicate_children <- master_df |>
+  count(v001, v002, v003, bidx) |>
+  filter(n > 1) |>
+  nrow()
+
+# 5.3 Invalid codes (DHS special missing codes: 8, 9 depending on variable)
+invalid_vacc_codes <- master_df |>
+  select(h0, h2, h3, h4, h5, h6, h7, h8, h9, h9a, h54:h58, h60) |>
+  summarise(across(everything(), ~ sum(. %in% c(8, 9), na.rm = TRUE))) |>
+  pivot_longer(everything(), names_to = "vaccine_var", values_to = "n_invalid_code")
+
+# 5.4 Impossible ages (age_months should be in a plausible 0-59-ish range)
+age_check <- master_df |>
+  mutate(age_months = v008 - b3) |>
+  summarise(
+    n_negative_age = sum(age_months < 0, na.rm = TRUE),
+    n_over_60m     = sum(age_months > 60, na.rm = TRUE))
+
+# 5.5 Anthropometric outliers (hw70 uses >1000 as a missing sentinel)
+anthro_check <- master_df |>
+  mutate(haz_raw = hw70 / 100) |>
+  summarise(
+    n_flagged_missing = sum(hw70 > 1000, na.rm = TRUE),
+    n_implausible_haz = sum(haz_raw < -6 | haz_raw > 6, na.rm = TRUE))
+
+# 5.6 Vaccination consistency (e.g. dose 3 recorded without dose 1/2)
+vacc_consistency <- master_df |>
+  summarise(
+    dpt_inconsistent = sum(h7 %in% c(1,2,3) & !(h5 %in% c(1,2,3)), na.rm = TRUE),
+    opv_inconsistent = sum(h8 %in% c(1,2,3) & !(h6 %in% c(1,2,3)), na.rm = TRUE))
+
+# 5.7 Survey-weight completeness
+weight_completeness <- master_df |>
+  summarise(pct_zero_or_missing_weight = round(100 * mean(is.na(v005) | v005 == 0), 2))
+
+# 5.8 Regional completeness (any county with near-total missingness on key vars)
+regional_completeness <- master_df |>
+  group_by(v024) |>
+  summarise(pct_missing_haz = round(100 * mean(is.na(hw70)), 2), .groups = "drop")
+
+quality_audit_summary <- list(
+  missingness            = missingness_report,
+  n_duplicate_children   = n_duplicate_children,
+  invalid_vacc_codes     = invalid_vacc_codes,
+  age_check              = age_check,
+  anthro_check           = anthro_check,
+  vacc_consistency       = vacc_consistency,
+  weight_completeness    = weight_completeness,
+  regional_completeness  = regional_completeness)
+
+saveRDS(quality_audit_summary, "Outputs/Tables/quality_audit_summary.rds")
+```
+
+## PHASE 6 — Data cleaning
+
+```{r}
+#| label: phase6-cleaning
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df <- df_raw |>
+  mutate(age_months = v008 - b3) |>
+  filter(
+    b5 == 1,              # child is alive
+    b9 == 0,               # child lives with the respondent
+    !is.na(v003)) |>       # mother's line number must be available
+  group_by(v001, v002, v003) |>
+  mutate(bidxr = rank(bidx, ties.method = "first")) |>
+  filter(bidxr == 1) |>    # keep youngest child per mother (avoids double-counting siblings)
+  ungroup()
+
+df <- df |>
+  mutate(
+    wt = v005 / 1000000,
+    wealth_cont = v191 / 100000,   # continuous wealth score, for concentration curves/SII-RII
+    wealth_q = v190)               # discrete 1-5 wealth quintile
+
+# Apply DHS special-missing recodes centrally (once), instead of per-outcome
+df <- df |>
+  mutate(across(c(h0, h2:h9, h9a, h54:h58, h60), ~ na_if(., 8)))
+
+# Pre-convert grouping variables to factors here, once. svychisq() needs
+# these as actual factor COLUMNS in the data (not `factor(var)` inline in the
+# formula) because model.frame() on a svydesign object returns raw variables,
+# not a computed model frame — `factor(wealth_q)` inline fails with
+# "undefined columns selected". haven::as_factor() also pulls the DHS value
+# labels already embedded in the .dta file ("Poorest"/"Richest",
+# "Urban"/"Rural") instead of us hardcoding them.
+df <- df |>
+  mutate(
+    wealth_q_f  = haven::as_factor(wealth_q),
+    residence_f = haven::as_factor(v025),
+    education_f = haven::as_factor(v106))
+
+# Mate's convention for the adjusted-OR analysis (Phase 11.4): the 5-quintile
+# breakdown stays the PRIMARY wealth variable everywhere else in this pipeline
+# (Phase 8 KDE/violin, Phase 9.4 discrete CSV, Phase 11 concentration curves/
+# SII-RII) — nothing about those is changed. wealth_3cat_f is an ADDITIONAL
+# collapsed variable used only for the adjusted-OR regression, since a 3-level
+# predictor keeps that specific regression table readable (Low = ref).
+df <- df |>
+  mutate(
+    wealth_3cat_f = fct_collapse(
+      wealth_q_f,
+      "Low"    = c("poorest", "poorer"),
+      "Middle" = "middle",
+      "High"   = c("richer", "richest")),
+    wealth_3cat_f = fct_relevel(wealth_3cat_f, "Low", "Middle", "High"))
+```
+
+`r nrow(df)` children retained from `r length(unique(df$v001))` clusters.
+
+## PHASE 7 — Data segmentation
+
+### 7.0 Age band
+
+All three outcomes use the same **12–35 month** child-age window, matching
+the mate's original analysis exactly (not the 12-35mo WHO reporting window
+used in an earlier draft of this pipeline — reverted per instruction):
+
+- **Stunting**: 12–35 months.
+- **Immunisation**: 12–23 / 24–35 months (the two sub-bands "fully
+  vaccinated" is defined over, since the `h9a`/measles-2nd-dose field is
+  only asked of the older band).
+- **Skilled birth attendance**: 12–35 months, DHS's standard recent-births
+  recall window.
+
+```{r}
+#| label: phase7-age-band-config
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+stunting_age_min <- 12
+stunting_age_max <- 35
+```
+
+### 7.1 Stunting dataset (12–35 months)
+
+```{r}
+#| label: phase7-stunting-segment
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_stunting <- df |>
+  mutate(
+    hw70 = ifelse(hw70 > 1000, NA, hw70),
+    haz = hw70 / 100,
+    stunted = ifelse(haz < -2, "Stunted", "Not stunted"),
+    stun = ifelse(stunted == "Stunted", 1, 0)) |>
+  filter(age_months >= stunting_age_min & age_months < stunting_age_max + 1,
+         !is.na(stunted))
+
+write_dta(df_stunting, "Data/Derived_data/df_stunting.dta")
+```
+
+### 7.2 Immunisation dataset (12–35 months)
+
+```{r}
+#| label: phase7-immunisation-segment
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_immunn_12_23 <- df |>
+  filter(age_months >= 12 & age_months < 24) |>
+  mutate(
+    fully_vaccinated = ifelse(
+      (h2 %in% c(1,2,3) & h0 %in% c(1,2,3) & h4 %in% c(1,2,3) &
+       h6 %in% c(1,2,3) & h8 %in% c(1,2,3) & h60 %in% c(1,2,3) &
+       h3 %in% c(1,2,3) & h5 %in% c(1,2,3) & h7 %in% c(1,2,3) &
+       h54 %in% c(1,2,3) & h55 %in% c(1,2,3) & h56 %in% c(1,2,3) &
+       h57 %in% c(1,2,3) & h58 %in% c(1,2,3) & h9 %in% c(1,2,3)),
+      "Fully vaccinated", "Not fully vaccinated"),
+    fully_vacc = ifelse(fully_vaccinated == "Fully vaccinated", 1, 0))
+
+df_immunn_24_35 <- df |>
+  filter(age_months >= 24 & age_months < 36) |>
+  mutate(
+    fully_vaccinated = ifelse(
+      (h2 %in% c(1,2,3) & h0 %in% c(1,2,3) & h4 %in% c(1,2,3) &
+       h6 %in% c(1,2,3) & h8 %in% c(1,2,3) & h60 %in% c(1,2,3) &
+       h3 %in% c(1,2,3) & h5 %in% c(1,2,3) & h7 %in% c(1,2,3) &
+       h54 %in% c(1,2,3) & h55 %in% c(1,2,3) & h56 %in% c(1,2,3) &
+       h57 %in% c(1,2,3) & h58 %in% c(1,2,3) & h9 %in% c(1,2,3) & h9a %in% c(1,2,3)),
+      "Fully vaccinated", "Not fully vaccinated"),
+    fully_vacc = ifelse(fully_vaccinated == "Fully vaccinated", 1, 0))
+
+df_immunn <- bind_rows(df_immunn_12_23, df_immunn_24_35)
+write_dta(df_immunn, "Data/Derived_data/df_immunisation.dta")
+```
+
+> Bug fix carried over from the integrated draft: `fully_vacc` must be `1`
+> for "Fully vaccinated" (the original had it inverted), since Phase 11/13
+> treat `fully_vacc` as a *positive* indicator when standardising and
+> indexing.
+
+### 7.3 Skilled birth attendance dataset (12–35 months)
+
+```{r}
+#| label: phase7-sba-segment
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_sba <- df |>
+  filter(!is.na(m3a), !is.na(m3b), age_months >= 12 & age_months < 36) |>
+  mutate(
+    sba = if_else(m3a == 1 | m3b == 1, "sba", "non sba"),
+    sba_num = if_else(m3a == 1 | m3b == 1, 1, 0))
+```
+
+## PHASE 8 — Exploratory data analysis
+
+```{r}
+#| label: fig-haz-histogram
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Histogram of HAZ scores (children 12-35 months)"
+
+haz_hist <- df_stunting |>
+  ggplot(aes(x = haz)) +
+  geom_histogram(color = "white") +
+  labs(x = "Height-for-age z-score (HAZ)", y = "Frequency") +
+  theme_bw(base_family = "Candara", base_size = 14) +
+  theme(panel.grid = element_blank())
+
+haz_hist
+ggsave("./Plots/HAZ_histogram.png", plot = haz_hist,
+       width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-haz-kde-wealth-residence
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "KDE of HAZ by wealth category (Low/Middle/High) and by residence"
+
+kde_wealth <- df_stunting |>
+  ggplot(aes(x = haz, fill = wealth_3cat_f, color = wealth_3cat_f)) +
+  geom_density(alpha = 0.3) +
+  labs(x = "HAZ", y = "Density", fill = NULL, color = NULL) +
+  theme_bw(base_family = "Candara", base_size = 14)
+
+kde_wealth
+ggsave("./Plots/HAZ_kde_wealth.png", plot = kde_wealth,
+       width = 7, height = 5, dpi = 500, bg = "white")
+
+kde_residence <- df_stunting |>
+  mutate(residence = factor(v025, labels = c("Urban", "Rural"))) |>
+  ggplot(aes(x = haz, fill = residence, color = residence)) +
+  geom_density(alpha = 0.3) +
+  labs(x = "HAZ", y = "Density", fill = NULL, color = NULL) +
+  theme_bw(base_family = "Candara", base_size = 14)
+
+kde_residence
+ggsave("./Plots/HAZ_kde_residence.png", plot = kde_residence,
+       width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-missingness-wealth-age
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Missingness by variable, wealth-category distribution, and child-age distribution"
+
+p_missing <- master_df |>
+  summarise(across(everything(), ~ mean(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "pct_missing") |>
+  ggplot(aes(x = reorder(variable, pct_missing), y = pct_missing)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = NULL, y = "Proportion missing") +
+  theme_bw(base_family = "Candara", base_size = 11)
+
+p_missing
+ggsave("./Plots/Missingness_by_variable.png", plot = p_missing,
+       width = 7, height = 8, dpi = 500, bg = "white")
+
+p_wealth <- df |>
+  ggplot(aes(x = wealth_3cat_f)) +
+  geom_bar(fill = "darkgreen") +
+  labs(x = "Wealth category", y = "n") +
+  theme_bw(base_family = "Candara", base_size = 14)
+
+p_wealth
+ggsave("./Plots/Wealth_quintile_distribution.png", plot = p_wealth,
+       width = 7, height = 5, dpi = 500, bg = "white")
+
+p_age <- df |>
+  ggplot(aes(x = age_months)) +
+  geom_histogram(binwidth = 3, fill = "steelblue", color = "white") +
+  labs(x = "Child age (months)", y = "n") +
+  theme_bw(base_family = "Candara", base_size = 14)
+
+p_age
+ggsave("./Plots/Child_age_distribution.png", plot = p_age,
+       width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: phase8-eda-correlation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Correlation among the continuous variables — a confounding check before
+# Phase 9/10 statistical comparisons.
+df_stunting |>
+  select(haz, wealth_cont, age_months) |>
+  drop_na() |>
+  cor() |>
+  round(2)
+```
+
+```{r}
+#| label: fig-haz-violin
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Violin plots of HAZ by wealth category (Low/Middle/High) and by residence"
+
+# Custom p-value formatter: R's floating-point floor is ~2.22e-16, so any
+# p-value the machine can't distinguish from that floor is reported as
+# "p < 2.22e-16" rather than a misleadingly precise-looking tiny number.
+format_pval <- function(p) {
+  if (p < 2.22e-16) {
+    "p < 2.22e-16"
+  } else if (p < 0.001) {
+    "p < 0.001"
+  } else {
+    paste0("p = ", format(round(p, 3), nsmall = 3))
+  }
+}
+
+kw_wealth <- kruskal.test(haz ~ wealth_3cat_f, data = df_stunting)
+label_wealth <- format_pval(kw_wealth$p.value)
+
+violin_wealth <- df_stunting |>
+  ggplot(aes(x = wealth_3cat_f, y = haz, fill = wealth_3cat_f)) +
+  geom_violin(alpha = 0.5, trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white") +
+  annotate("text", x = 1, y = max(df_stunting$haz, na.rm = TRUE) + 0.5,
+           label = label_wealth, hjust = 0, family = "Candara", size = 4.2) +
+  labs(x = "Wealth category", y = "HAZ", fill = NULL) +
+  theme_bw(base_family = "Candara", base_size = 14) +
+  theme(legend.position = "none")
+
+violin_wealth
+ggsave("./Plots/HAZ_violin_wealth.png", plot = violin_wealth,
+       width = 7, height = 5, dpi = 500, bg = "white")
+
+df_stunting_res <- df_stunting |> mutate(residence = haven::as_factor(v025))
+
+kw_residence <- kruskal.test(haz ~ residence, data = df_stunting_res)
+label_residence <- format_pval(kw_residence$p.value)
+
+violin_residence <- df_stunting_res |>
+  ggplot(aes(x = residence, y = haz, fill = residence)) +
+  geom_violin(alpha = 0.5, trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white") +
+  annotate("text", x = 1, y = max(df_stunting_res$haz, na.rm = TRUE) + 0.5,
+           label = label_residence, hjust = 0, family = "Candara", size = 4.2) +
+  labs(x = "Residence", y = "HAZ", fill = NULL) +
+  theme_bw(base_family = "Candara", base_size = 14) +
+  theme(legend.position = "none")
+
+violin_residence
+ggsave("./Plots/HAZ_violin_residence.png", plot = violin_residence,
+       width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-correlation-heatmap
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Correlation heatmap of continuous variables (HAZ, wealth, child age)"
+
+corr_mat <- df_stunting |>
+  select(HAZ = haz, Wealth = wealth_cont, `Age (months)` = age_months) |>
+  drop_na() |>
+  cor()
+
+corr_long <- as_tibble(corr_mat, rownames = "var1") |>
+  pivot_longer(-var1, names_to = "var2", values_to = "r")
+
+corr_heatmap <- corr_long |>
+  ggplot(aes(x = var1, y = var2, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(r, 2)), family = "Candara", size = 4) +
+  scale_fill_gradient2(low = "#813134", mid = "white", high = "navyblue",
+                        midpoint = 0, limits = c(-1, 1)) +
+  labs(x = NULL, y = NULL, fill = "r") +
+  theme_minimal(base_family = "Candara", base_size = 13) +
+  theme(panel.grid = element_blank())
+
+corr_heatmap
+ggsave("./Plots/Correlation_heatmap.png", plot = corr_heatmap,
+       width = 6, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-scatterplot-matrix
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 8
+#| fig-height: 8
+#| fig-cap: "Scatterplot matrix of HAZ, wealth, and child age, coloured by stunting status"
+
+pacman::p_load(GGally)
+
+pairs_matrix <- df_stunting |>
+  select(HAZ = haz, Wealth = wealth_cont, `Age (months)` = age_months, stunted) |>
+  drop_na() |>
+  ggpairs(columns = 1:3, aes(color = stunted, alpha = 0.5)) +
+  theme_bw(base_family = "Candara", base_size = 10)
+
+pairs_matrix
+ggsave("./Plots/Scatterplot_matrix.png", plot = pairs_matrix,
+       width = 8, height = 8, dpi = 500, bg = "white")
+```
+
+## PHASE 9 — Indicator analysis: national, regional, wealth, residence & education
+
+```{r}
+#| label: phase9-plotting-functions
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+plot_pointrange <- function(data, x_var, estimate, lower, upper,
+                             reference_line = NULL, y_limits = c(5, 50),
+                             y_breaks = seq(5, 50, 5),
+                             y_label = "Weighted prevalence (%)") {
+  x_var <- rlang::ensym(x_var); estimate <- rlang::ensym(estimate)
+  lower <- rlang::ensym(lower); upper <- rlang::ensym(upper)
+
+  p <- data |>
+    ggplot(aes(x = forcats::fct_reorder(!!x_var, !!estimate, .desc = TRUE), y = !!estimate)) +
+    geom_pointrange(aes(ymin = !!lower, ymax = !!upper), size = .3, color = "gray30") +
+    scale_y_continuous(limits = y_limits, breaks = y_breaks) +
+    labs(x = NULL, y = y_label) +
+    theme_bw(base_family = "Candara", base_size = 14) +
+    theme(axis.text = element_text(color = "black"),
+          axis.text.x = element_text(angle = 90, vjust = .5))
+
+  if (!is.null(reference_line)) {
+    p <- p + geom_hline(yintercept = reference_line, lty = 2, color = "blue")
+  }
+  p
+}
+
+plot_map <- function(data, fill, breaks, labels, legend_title, subtitle,
+                      palette = "YlGnBu", direction = 1) {
+  fill <- rlang::ensym(fill)
+  data |>
+    mutate(fill_cat = cut(!!fill, breaks = breaks, labels = labels,
+                           right = FALSE, include.lowest = TRUE)) |>
+    ggplot() +
+    geom_sf(aes(fill = fill_cat), color = "gray30") +
+    scale_fill_brewer(palette = palette, direction = direction) +
+    labs(fill = legend_title, subtitle = subtitle) +
+    theme_minimal(base_family = "Candara", base_size = 14) +
+    theme(axis.text = element_blank(),
+          plot.subtitle = element_text(hjust = .6, vjust = -8),
+          legend.background = element_rect(color = "gray70"),
+          legend.title = element_text(size = 10.5),
+          legend.text = element_text(size = 10.5),
+          legend.position = c(0.15, 0.16),
+          panel.grid = element_blank())
+}
+
+# Helper — weighted prevalence + 95% CI by wealth CATEGORY (Low/Middle/High)
+# for any 0/1 outcome, used by 9.4 below to produce the wealth-category CSV
+# deliverable for every indicator with one call. Uses wealth_3cat_f (not the
+# 5-quintile wealth_q_f), matching the mate's convention.
+wealth_category_table <- function(survey_design, outcome_formula, indicator_name) {
+  out <- svyby(outcome_formula, by = ~wealth_3cat_f, design = survey_design,
+               FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+  tibble(
+    indicator = indicator_name,
+    wealth_category = as.character(out$wealth_3cat_f),
+    prevalence_pct = round(out[[2]] * 100, 1),
+    ci_lower_pct = round(out$ci_l * 100, 1),
+    ci_upper_pct = round(out$ci_u * 100, 1))
+}
+```
+
+### 9.1 Stunting — national, county, wealth, residence, education
+
+```{r}
+#| label: phase9-stunting-survey
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+stunting_survey <- svydesign(id = ~v021, strata = ~v022, weights = ~wt,
+                              data = df_stunting, nest = TRUE)
+
+tbl_stunting <- tbl_svysummary(
+  stunting_survey, include = stunted,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany", missing_text = "Missing",
+  label = stunted ~ "Stunting status")
+```
+
+```{r}
+#| label: fig-prev-counties-stunting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 10
+#| fig-height: 6
+#| fig-cap: "Weighted prevalence of stunting among children 12-35 months by county. Blue line = national weighted prevalence"
+
+county_stunting <- svyby(~ I(stunted == "Stunted"), by = ~v024,
+                          design = stunting_survey, FUN = svyciprop,
+                          vartype = "ci", na.rm = TRUE)
+
+national_prev_stunting <- as.numeric(
+  str_extract(tbl_stunting$table_body$stat_0[[3]], "(?<=\\()[0-9.]+(?=\\))"))
+
+# Write the Task 2 "county stunting CSV + confidence intervals" deliverable
+county_stunting_csv <- county_stunting |>
+  mutate(county = haven::as_factor(v024),
+         prevalence_pct = round(`I(stunted == "Stunted")` * 100, 1),
+         ci_lower_pct = round(ci_l * 100, 1), ci_upper_pct = round(ci_u * 100, 1)) |>
+  select(county, prevalence_pct, ci_lower_pct, ci_upper_pct)
+
+write_csv(county_stunting_csv, "Outputs/Tables/county_stunting_with_CI.csv")
+
+county_stunting_csv |>
+  plot_pointrange(x_var = county, estimate = prevalence_pct,
+                   lower = ci_lower_pct, upper = ci_upper_pct,
+                   reference_line = national_prev_stunting,
+                   y_limits = c(0, 60), y_breaks = seq(0, 60, 5)) +
+  annotate("text", x = 25, y = 55,
+           label = paste0("National average = ", national_prev_stunting, "%")) +
+  theme(axis.text.x = element_text(size = 12), panel.grid = element_line(color = "gray96"))
+
+ggsave("./Plots/Stunting_forest_plot.png", width = 10, height = 6, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-stunting-residence-education
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Weighted prevalence of stunting by residence and by maternal education"
+
+residence_stunting <- svyby(~ I(stunted == "Stunted"), by = ~v025,
+                             design = stunting_survey, FUN = svyciprop,
+                             vartype = "ci", na.rm = TRUE)
+
+education_stunting <- svyby(~ I(stunted == "Stunted"), by = ~v106,
+                             design = stunting_survey, FUN = svyciprop,
+                             vartype = "ci", na.rm = TRUE)
+
+residence_stunting |>
+  mutate(group = haven::as_factor(v025),
+         prevalence = round(`I(stunted == "Stunted")` * 100, 1),
+         lb = round(ci_l * 100, 1), ub = round(ci_u * 100, 1)) |>
+  plot_pointrange(x_var = group, estimate = prevalence, lower = lb, upper = ub,
+                   reference_line = national_prev_stunting,
+                   y_limits = c(0, 60), y_breaks = seq(0, 60, 5))
+ggsave("./Plots/Stunting_by_residence.png", width = 6, height = 5, dpi = 500, bg = "white")
+
+education_stunting |>
+  mutate(group = haven::as_factor(v106),
+         prevalence = round(`I(stunted == "Stunted")` * 100, 1),
+         lb = round(ci_l * 100, 1), ub = round(ci_u * 100, 1)) |>
+  plot_pointrange(x_var = group, estimate = prevalence, lower = lb, upper = ub,
+                   reference_line = national_prev_stunting,
+                   y_limits = c(0, 60), y_breaks = seq(0, 60, 5))
+ggsave("./Plots/Stunting_by_education.png", width = 6, height = 5, dpi = 500, bg = "white")
+```
+
+### 9.2 Immunisation — coverage, dropout, residence
+
+```{r}
+#| label: phase9-immunisation-dropout
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+immunn_survey <- svydesign(id = ~v021, strata = ~v022, weights = ~wt,
+                            data = df_immunn, nest = TRUE)
+
+antigen_vars <- c(bcg = "h2", opv1 = "h4", opv3 = "h8",
+                   penta1 = "h3", penta3 = "h7",
+                   pcv1 = "h54", pcv3 = "h56",
+                   rota1 = "h57", rota2 = "h58",
+                   mr1 = "h9")
+
+antigen_coverage <- map_dfr(names(antigen_vars), function(nm) {
+  var <- antigen_vars[[nm]]
+  svymean(as.formula(paste0("~ I(", var, " %in% c(1,2,3))")),
+          design = immunn_survey, na.rm = TRUE) |>
+    as_tibble() |>
+    mutate(antigen = nm) |>
+    select(antigen, coverage = 1)
+})
+
+dropout_bcg_to_mr1 <- (antigen_coverage$coverage[antigen_coverage$antigen == "bcg"] -
+                        antigen_coverage$coverage[antigen_coverage$antigen == "mr1"]) /
+                        antigen_coverage$coverage[antigen_coverage$antigen == "bcg"]
+
+write_csv(antigen_coverage, "Outputs/Tables/immunisation_antigen_coverage.csv")
+```
+
+```{r}
+#| label: fig-prev-counties-immun
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 10
+#| fig-height: 6
+#| fig-cap: "Weighted prevalence of full vaccination among children 12-35 months by county. Blue line = national weighted prevalence"
+
+tbl_immun <- tbl_svysummary(
+  immunn_survey, include = fully_vaccinated,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany", missing_text = "Missing",
+  label = fully_vaccinated ~ "Vaccination status")
+
+county_immunn <- svyby(~ I(fully_vaccinated == "Fully vaccinated"), by = ~v024,
+                        design = immunn_survey, FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+
+national_prev_immunn <- as.numeric(
+  str_extract(tbl_immun$table_body$stat_0[[3]], "(?<=\\()[0-9.]+(?=\\))"))
+
+county_immunn_csv <- county_immunn |>
+  mutate(county = haven::as_factor(v024),
+         prevalence_pct = round(`I(fully_vaccinated == "Fully vaccinated")` * 100, 1),
+         ci_lower_pct = round(ci_l * 100, 1), ci_upper_pct = round(ci_u * 100, 1)) |>
+  select(county, prevalence_pct, ci_lower_pct, ci_upper_pct)
+
+write_csv(county_immunn_csv, "Outputs/Tables/county_immunisation_with_CI.csv")
+
+county_immunn_csv |>
+  plot_pointrange(x_var = county, estimate = prevalence_pct,
+                   lower = ci_lower_pct, upper = ci_upper_pct,
+                   reference_line = national_prev_immunn,
+                   y_limits = c(0, 100), y_breaks = seq(0, 100, 10)) +
+  annotate("text", x = 25, y = 90,
+           label = paste0("National average = ", national_prev_immunn, "%")) +
+  theme(axis.text.x = element_text(size = 12), panel.grid = element_line(color = "gray96"))
+
+ggsave("./Plots/Vaccination_forest_plot.png", width = 10, height = 6, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-immunisation-residence
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Weighted prevalence of full vaccination by residence"
+
+residence_immunn <- svyby(~ I(fully_vaccinated == "Fully vaccinated"), by = ~v025,
+                           design = immunn_survey, FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+
+residence_immunn |>
+  mutate(group = haven::as_factor(v025),
+         prevalence = round(`I(fully_vaccinated == "Fully vaccinated")` * 100, 1),
+         lb = round(ci_l * 100, 1), ub = round(ci_u * 100, 1)) |>
+  plot_pointrange(x_var = group, estimate = prevalence, lower = lb, upper = ub,
+                   reference_line = national_prev_immunn,
+                   y_limits = c(0, 100), y_breaks = seq(0, 100, 10))
+ggsave("./Plots/Vaccination_by_residence.png", width = 6, height = 5, dpi = 500, bg = "white")
+```
+
+### 9.3 Skilled birth attendance — coverage, residence, education
+
+```{r}
+#| label: phase9-sba-residence-education
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+df_sba_survey <- svydesign(id = ~v021, strata = ~v022, weights = ~wt,
+                            data = df_sba, nest = TRUE)
+
+tbl_sba <- tbl_svysummary(
+  df_sba_survey, include = sba,
+  statistic = all_categorical() ~ "{n} ({p})",
+  digits = all_categorical() ~ c(1, 1),
+  missing = "ifany", missing_text = "Missing",
+  label = sba ~ "Skilled birth attendance")
+
+county_sba <- svyby(~ I(sba == "sba"), by = ~v024, design = df_sba_survey,
+                     FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+
+national_prev_sba <- as.numeric(
+  str_extract(tbl_sba$table_body$stat_0[[3]], "(?<=\\()[0-9.]+(?=\\))"))
+
+county_sba_csv <- county_sba |>
+  mutate(county = haven::as_factor(v024),
+         prevalence_pct = round(`I(sba == "sba")` * 100, 1),
+         ci_lower_pct = round(ci_l * 100, 1), ci_upper_pct = round(ci_u * 100, 1)) |>
+  select(county, prevalence_pct, ci_lower_pct, ci_upper_pct)
+
+write_csv(county_sba_csv, "Outputs/Tables/county_sba_with_CI.csv")
+```
+
+```{r}
+#| label: fig-prev-counties-sba
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 10
+#| fig-height: 6
+#| fig-cap: "Weighted prevalence of skilled birth attendance among children 12-35 months by county. Blue line = national weighted prevalence"
+
+county_sba_csv |>
+  plot_pointrange(x_var = county, estimate = prevalence_pct,
+                   lower = ci_lower_pct, upper = ci_upper_pct,
+                   reference_line = national_prev_sba,
+                   y_limits = c(30, 100), y_breaks = seq(30, 100, 10)) +
+  annotate("text", x = 15, y = 60,
+           label = paste0("National average = ", national_prev_sba, "%")) +
+  theme(axis.text.x = element_text(size = 12), panel.grid = element_line(color = "gray96"))
+
+ggsave("./Plots/Sba_forest_plot.png", width = 10, height = 6, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-sba-residence-education
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Weighted prevalence of skilled birth attendance by residence and by maternal education"
+
+residence_sba <- svyby(~ I(sba == "sba"), by = ~v025, design = df_sba_survey,
+                        FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+education_sba <- svyby(~ I(sba == "sba"), by = ~v106, design = df_sba_survey,
+                        FUN = svyciprop, vartype = "ci", na.rm = TRUE)
+
+residence_sba |>
+  mutate(group = haven::as_factor(v025),
+         prevalence = round(`I(sba == "sba")` * 100, 1),
+         lb = round(ci_l * 100, 1), ub = round(ci_u * 100, 1)) |>
+  plot_pointrange(x_var = group, estimate = prevalence, lower = lb, upper = ub,
+                   reference_line = national_prev_sba,
+                   y_limits = c(30, 100), y_breaks = seq(30, 100, 10))
+ggsave("./Plots/Sba_by_residence.png", width = 6, height = 5, dpi = 500, bg = "white")
+
+education_sba |>
+  mutate(group = haven::as_factor(v106),
+         prevalence = round(`I(sba == "sba")` * 100, 1),
+         lb = round(ci_l * 100, 1), ub = round(ci_u * 100, 1)) |>
+  plot_pointrange(x_var = group, estimate = prevalence, lower = lb, upper = ub,
+                   reference_line = national_prev_sba,
+                   y_limits = c(30, 100), y_breaks = seq(30, 100, 10))
+ggsave("./Plots/Sba_by_education.png", width = 6, height = 5, dpi = 500, bg = "white")
+```
+
+### 9.4 Discrete wealth-category CSV (all three indicators)
+
+```{r}
+#| label: phase9-discrete-wealth-category-csv
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Wealth-category breakdown per indicator (Low/Middle/High), using the
+# `wealth_category_table()` helper defined above, so all three indicators
+# are produced with one consistent method. Matches the mate's 3-category
+# convention — see Phase 6 for how wealth_3cat_f is built from wealth_q.
+wealth_category_indicators <- bind_rows(
+  wealth_category_table(stunting_survey, ~ I(stunted == "Stunted"), "Stunting"),
+  wealth_category_table(immunn_survey,   ~ I(fully_vaccinated == "Fully vaccinated"), "Full immunisation"),
+  wealth_category_table(df_sba_survey,   ~ I(sba == "sba"), "Skilled birth attendance"))
+
+write_csv(wealth_category_indicators, "Outputs/Tables/wealth_category_indicators.csv")
+wealth_category_indicators
+```
+
+```{r}
+#| label: fig-wealth-category-indicators
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Weighted prevalence by wealth category (Low/Middle/High), all three indicators"
+
+wealth_category_indicators |>
+  mutate(wealth_category = fct_relevel(wealth_category, "Low", "Middle", "High")) |>
+  ggplot(aes(x = wealth_category, y = prevalence_pct, group = indicator, color = indicator)) +
+  geom_line(linewidth = 1) +
+  geom_pointrange(aes(ymin = ci_lower_pct, ymax = ci_upper_pct)) +
+  labs(x = "Wealth category", y = "Weighted prevalence (%)", color = NULL) +
+  theme_bw(base_family = "Candara", base_size = 13)
+
+ggsave("./Plots/Wealth_category_indicators.png", width = 8, height = 5, dpi = 500, bg = "white")
+```
+
+### 9.5 Indicator trends across child age
+
+```{r}
+#| label: fig-indicator-trends-age
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Trend in stunting, full vaccination, and skilled birth attendance across child age (months)"
+
+# NOTE ON SCOPE: KDHS 2022 is a single cross-sectional wave, so a true time
+# trend (2014 -> 2022) needs the earlier wave's KR file harmonised in — not
+# implemented here for lack of that second dataset. What this CAN show is
+# an age-based trend within the current wave: does prevalence/coverage
+# shift as children get older (informative for stunting's cumulative
+# deficit and immunisation's catch-up dosing).
+
+stunting_by_age <- df_stunting |>
+  mutate(age_bin = cut(age_months, breaks = seq(stunting_age_min, stunting_age_max, 6),
+                        include.lowest = TRUE)) |>
+  group_by(age_bin) |>
+  summarise(prevalence = weighted.mean(stun, wt, na.rm = TRUE) * 100, .groups = "drop") |>
+  mutate(indicator = "Stunting")
+
+immunn_by_age <- df_immunn |>
+  mutate(age_bin = cut(age_months, breaks = seq(12, 36, 3), include.lowest = TRUE)) |>
+  group_by(age_bin) |>
+  summarise(prevalence = weighted.mean(fully_vacc, wt, na.rm = TRUE) * 100, .groups = "drop") |>
+  mutate(indicator = "Full vaccination")
+
+sba_by_age <- df_sba |>
+  mutate(age_bin = cut(age_months, breaks = seq(12, 36, 3), include.lowest = TRUE)) |>
+  group_by(age_bin) |>
+  summarise(prevalence = weighted.mean(sba_num, wt, na.rm = TRUE) * 100, .groups = "drop") |>
+  mutate(indicator = "Skilled birth attendance")
+
+trend_df <- bind_rows(stunting_by_age, immunn_by_age, sba_by_age)
+
+trend_df |>
+  ggplot(aes(x = age_bin, y = prevalence, color = indicator, group = indicator)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  labs(x = "Child age (months)", y = "Weighted prevalence / coverage (%)", color = NULL) +
+  theme_bw(base_family = "Candara", base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("./Plots/Indicator_trends_by_age.png", width = 8, height = 5, dpi = 500, bg = "white")
+write_csv(trend_df, "Outputs/Tables/indicator_trends_by_age.csv")
+```
+
+## PHASE 10 — Statistical association tests
+
+```{r}
+#| label: phase10-association-tests
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Survey-adjusted chi-square tests: outcome x equity dimension.
+# Uses wealth_q_f / residence_f / education_f built in Phase 6 — see Phase 6
+# comment for why an inline factor() transform silently fails svychisq().
+stunting_x_wealth    <- svychisq(~ stunted + wealth_q_f, stunting_survey)
+stunting_x_residence <- svychisq(~ stunted + residence_f, stunting_survey)
+stunting_x_education <- svychisq(~ stunted + education_f, stunting_survey)
+
+immunn_x_wealth    <- svychisq(~ fully_vaccinated + wealth_q_f, immunn_survey)
+immunn_x_residence <- svychisq(~ fully_vaccinated + residence_f, immunn_survey)
+
+sba_x_wealth    <- svychisq(~ sba + wealth_q_f, df_sba_survey)
+sba_x_residence <- svychisq(~ sba + residence_f, df_sba_survey)
+sba_x_education <- svychisq(~ sba + education_f, df_sba_survey)
+
+association_tests <- tibble(
+  comparison = c("stunting x wealth", "stunting x residence", "stunting x education",
+                 "immunisation x wealth", "immunisation x residence",
+                 "sba x wealth", "sba x residence", "sba x education"),
+  p_value = c(stunting_x_wealth$p.value, stunting_x_residence$p.value,
+              stunting_x_education$p.value, immunn_x_wealth$p.value,
+              immunn_x_residence$p.value, sba_x_wealth$p.value,
+              sba_x_residence$p.value, sba_x_education$p.value))
+
+write_csv(association_tests, "Outputs/Tables/association_tests.csv")
+association_tests
+```
+
+## PHASE 11 — Wealth-equity indices: adjusted OR, concentration curves, CI, SII & RII
+
+### 11.0 Wealth-adjusted odds ratios (Low/Middle/High)
+
+```{r}
+#| label: phase11-adjusted-or
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Reproduces mate's "Adjusted Odds Ratios by wealth status" box shown on each
+# concentration curve. Computed HERE (survey-weighted logistic regression,
+# adjusted for residence + maternal education) rather than read from an
+# external CSV, so the pipeline stays self-contained and doesn't fail with
+# a file.exists() error the way earlier draft paths did.
+pacman::p_load(broom)
+
+format_or_table <- function(design, outcome_formula, indicator_label) {
+  fit <- svyglm(outcome_formula, design = design, family = quasibinomial())
+
+  or_tbl <- broom::tidy(fit, exponentiate = TRUE, conf.int = FALSE) |>
+    filter(str_starts(term, "wealth_3cat_f")) |>
+    mutate(
+      label = str_remove(term, "wealth_3cat_f"),
+      estimate = as.character(round(estimate, 2)),
+      p.value = as.character(round(p.value, 3))) |>
+    select(label, estimate, p.value)
+
+  # Low is the reference level and never appears as a term — add it back
+  # explicitly with NA so downstream code turns it into "Ref"
+  bind_rows(
+    tibble(label = "Household wealth status", estimate = NA_character_, p.value = NA_character_),
+    tibble(label = "Low", estimate = NA_character_, p.value = NA_character_),
+    or_tbl) |>
+    mutate(indicator = indicator_label)
+}
+
+or_estimates <- format_or_table(
+  stunting_survey, stun ~ wealth_3cat_f + residence_f + education_f, "Stunting")
+write_csv(or_estimates, "Outputs/Tables/dhs_stunting_WI_adjusted_OR.csv")
+
+or_estimates_immun <- format_or_table(
+  immunn_survey, fully_vacc ~ wealth_3cat_f + residence_f + education_f, "Full vaccination")
+write_csv(or_estimates_immun, "Outputs/Tables/dhs_immunisation_WI_adjusted_OR.csv")
+
+or_estimates_sba <- format_or_table(
+  df_sba_survey, sba_num ~ wealth_3cat_f + residence_f + education_f, "SBA")
+write_csv(or_estimates_sba, "Outputs/Tables/dhs_sba_WI_adjusted_OR.csv")
+
+bind_rows(or_estimates, or_estimates_immun, or_estimates_sba) |>
+  filter(label != "Household wealth status")
+```
+
+### 11.1 Concentration curves
+
+```{r}
+#| label: fig-concentration-stunting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curve — equity/inequity in the distribution of stunting by wealth status"
+
+cc_df <- df_stunting |>
+  filter(!is.na(stun), !is.na(wealth_cont), !is.na(wt)) |>
+  arrange(wealth_cont) |>
+  mutate(pop_rank = cumsum(wt) - wt / 2, pop_rank = pop_rank / sum(wt)) |>
+  group_by(wealth_cont) |>
+  mutate(pop_rank = mean(pop_rank)) |>
+  ungroup() |>
+  arrange(pop_rank) |>
+  mutate(cum_prop = cumsum(wt) / sum(wt),
+         cum_stunted = cumsum(stun * wt) / sum(stun * wt))
+
+cc_plot_data <- bind_rows(
+  tibble(cum_prop = 0, cum_stunted = 0),
+  cc_df |> select(cum_prop, cum_stunted))
+
+ci_result_stunting <- ci(ineqvar = df_stunting$wealth_cont, outcome = df_stunting$stun,
+                          weights = df_stunting$wt, type = "CIw")
+
+or_text_stunting <- paste0(
+  "Adjusted Odds Ratios for stunting\nby wealth status\n",
+  "----------------------------------------------------------------\n",
+  "Low      Ref\n",
+  "Middle   ", or_estimates$estimate[or_estimates$label == "Middle"],
+  " ; p ", or_estimates$p.value[or_estimates$label == "Middle"], "\n",
+  "High     ", or_estimates$estimate[or_estimates$label == "High"],
+  " ; p ", or_estimates$p.value[or_estimates$label == "High"], "")
+
+cc_plot_data |>
+  ggplot(aes(x = cum_prop, y = cum_stunted)) +
+  geom_line(color = "navyblue", linewidth = 1) +
+  geom_abline(slope = 1, intercept = 0, color = "#813134") +
+  annotate("label", x = 0.05, y = 0.95,
+           label = paste0("CI (95% CI) = ", round(ci_result_stunting$concentration_index, 2),
+                           " (", round(confint(ci_result_stunting)[[1]], 2), ", ",
+                           round(confint(ci_result_stunting)[[2]], 2), ")"),
+           family = "Candara", hjust = 0, vjust = 1, size = 4.0) +
+  annotate("label", x = 0.55, y = 0.45, label = or_text_stunting,
+           family = "Candara", hjust = 0, vjust = 1, size = 4, fill = "white", colour = "black") +
+  labs(x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+       y = "Cumulative % of stunted children") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(panel.grid = element_blank())
+
+ggsave("./Plots/Stunting_concentration_curve.png", width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-concentration-immunisation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curve — equity/inequity in the distribution of full vaccination by wealth status"
+
+cc_df_immunn <- df_immunn |>
+  filter(!is.na(fully_vacc), !is.na(wealth_cont), !is.na(wt)) |>
+  arrange(wealth_cont) |>
+  mutate(pop_rank = cumsum(wt) - wt / 2, pop_rank = pop_rank / sum(wt)) |>
+  group_by(wealth_cont) |>
+  mutate(pop_rank = mean(pop_rank)) |>
+  ungroup() |>
+  arrange(pop_rank) |>
+  mutate(cum_prop = cumsum(wt) / sum(wt),
+         cum_full_vacc = cumsum(fully_vacc * wt) / sum(fully_vacc * wt))
+
+cc_plot_data_immunn <- bind_rows(
+  tibble(cum_prop = 0, cum_full_vacc = 0),
+  cc_df_immunn |> select(cum_prop, cum_full_vacc))
+
+ci_result_immunn <- ci(ineqvar = df_immunn$wealth_cont, outcome = df_immunn$fully_vacc,
+                        weights = df_immunn$wt, type = "CIw")
+
+or_text_immun <- paste0(
+  "Adjusted Odds Ratios for full vaccination\nby wealth status\n",
+  "----------------------------------------------------------------\n",
+  "Low      Ref\n",
+  "Middle   ", or_estimates_immun$estimate[or_estimates_immun$label == "Middle"],
+  " ; p ", or_estimates_immun$p.value[or_estimates_immun$label == "Middle"], "\n",
+  "High     ", or_estimates_immun$estimate[or_estimates_immun$label == "High"],
+  " ; p ", or_estimates_immun$p.value[or_estimates_immun$label == "High"], "")
+
+cc_plot_data_immunn |>
+  ggplot(aes(x = cum_prop, y = cum_full_vacc)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_abline(slope = 1, intercept = 0, color = "#813134") +
+  annotate("label", x = 0.05, y = 0.95,
+           label = paste0("CI (95% CI) = ", round(ci_result_immunn$concentration_index, 2),
+                           " (", round(confint(ci_result_immunn)[[1]], 2), ", ",
+                           round(confint(ci_result_immunn)[[2]], 2), ")"),
+           family = "Candara", hjust = 0, vjust = 1, size = 4.0) +
+  annotate("label", x = 0.50, y = 0.43, label = or_text_immun,
+           family = "Candara", hjust = 0, vjust = 1, size = 4, fill = "white", colour = "black") +
+  labs(x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+       y = "Cumulative % of fully vaccinated children") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(panel.grid = element_blank())
+
+ggsave("./Plots/Vaccination_concentration_curve.png", width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-concentration-sba
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Concentration curve — equity/inequity in the distribution of skilled birth attendance by wealth status"
+
+cc_df_sba <- df_sba |>
+  filter(!is.na(sba_num), !is.na(wealth_cont), !is.na(wt)) |>
+  arrange(wealth_cont) |>
+  mutate(pop_rank = cumsum(wt) - wt / 2, pop_rank = pop_rank / sum(wt)) |>
+  group_by(wealth_cont) |>
+  mutate(pop_rank = mean(pop_rank)) |>
+  ungroup() |>
+  arrange(pop_rank) |>
+  mutate(cum_prop = cumsum(wt) / sum(wt),
+         cum_sba = cumsum(sba_num * wt) / sum(sba_num * wt))
+
+cc_plot_data_sba <- bind_rows(
+  tibble(cum_prop = 0, cum_sba = 0),
+  cc_df_sba |> select(cum_prop, cum_sba))
+
+ci_result_sba <- ci(ineqvar = df_sba$wealth_cont, outcome = df_sba$sba_num,
+                     weights = df_sba$wt, type = "CIw")
+
+or_text_sba <- paste0(
+  "Adjusted Odds Ratios for SBA\nby wealth status\n",
+  "----------------------------------------------------------------\n",
+  "Low      Ref\n",
+  "Middle   ", or_estimates_sba$estimate[or_estimates_sba$label == "Middle"],
+  " ; p ", or_estimates_sba$p.value[or_estimates_sba$label == "Middle"], "\n",
+  "High     ", or_estimates_sba$estimate[or_estimates_sba$label == "High"],
+  " ; p ", or_estimates_sba$p.value[or_estimates_sba$label == "High"], "")
+
+cc_plot_data_sba |>
+  ggplot(aes(x = cum_prop, y = cum_sba)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_abline(slope = 1, intercept = 0, color = "#813134") +
+  annotate("label", x = 0.05, y = 0.95,
+           label = paste0("CI (95% CI) = ", round(ci_result_sba$concentration_index, 2),
+                           " (", round(confint(ci_result_sba)[[1]], 2), ", ",
+                           round(confint(ci_result_sba)[[2]], 2), ")"),
+           family = "Candara", hjust = 0, vjust = 1, size = 4.0) +
+  annotate("label", x = 0.50, y = 0.43, label = or_text_sba,
+           family = "Candara", hjust = 0, vjust = 1, size = 4, fill = "white", colour = "black") +
+  labs(x = "Cumulative % of children, ranked by wealth (poorest \u2192 richest)",
+       y = "Cumulative % of skilled birth attendance") +
+  theme_classic(base_family = "Candara", base_size = 13) +
+  theme(panel.grid = element_blank())
+
+ggsave("./Plots/Sba_concentration_curve.png", width = 7, height = 5, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: phase11-sii-rii-function
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Slope Index of Inequality (SII) and Relative Index of Inequality (RII):
+# fractional wealth rank regressed against the outcome (survey-weighted
+# linear model), following the standard WHO HEAT approach.
+calc_sii_rii <- function(data, outcome_var, wealth_var = "wealth_cont", weight_var = "wt") {
+  d <- data |>
+    filter(!is.na(.data[[outcome_var]]), !is.na(.data[[wealth_var]]), !is.na(.data[[weight_var]])) |>
+    arrange(.data[[wealth_var]]) |>
+    mutate(
+      rank_mid = cumsum(.data[[weight_var]]) - .data[[weight_var]] / 2,
+      frac_rank = rank_mid / sum(.data[[weight_var]]))
+
+  design <- svydesign(ids = ~1, weights = as.formula(paste0("~", weight_var)), data = d)
+  fit <- svyglm(as.formula(paste0(outcome_var, " ~ frac_rank")), design = design)
+
+  sii <- coef(fit)[["frac_rank"]]
+  mean_outcome <- svymean(as.formula(paste0("~", outcome_var)), design)[1]
+  rii <- sii / mean_outcome
+
+  tibble(sii = sii, rii = rii, mean_outcome = mean_outcome)
+}
+
+sii_rii_stunting <- calc_sii_rii(df_stunting, "stun")
+sii_rii_immunn   <- calc_sii_rii(df_immunn |> mutate(non_vacc = 1 - fully_vacc), "non_vacc")
+sii_rii_sba      <- calc_sii_rii(df_sba, "sba_num")
+
+sii_rii_summary <- bind_rows(
+  sii_rii_stunting |> mutate(indicator = "stunting"),
+  sii_rii_immunn   |> mutate(indicator = "non-immunisation"),
+  sii_rii_sba      |> mutate(indicator = "sba"))
+
+write_csv(sii_rii_summary, "Outputs/Tables/sii_rii_summary.csv")
+sii_rii_summary
+```
+
+## PHASE 12 — Spatial analysis: county maps and spatial autocorrelation
+
+```{r}
+#| label: phase12-shapefile
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Requires the rKenyaCensus package (pure data, no compiled code):
+#   remotes::install_github("Shelmith-Kariuki/rKenyaCensus")
+# Fallback if unavailable: a downloaded county boundary shapefile, e.g. GADM
+# level 1 for Kenya (https://gadm.org/download_country.html).
+
+kenya_shp <- rKenyaCensus::KenyaCounties_SHP |>
+  sf::st_as_sf() |>
+  sf::st_make_valid() |>
+  janitor::clean_names() |>
+  select(county) |>
+  mutate(county = str_to_title(county) |> str_replace_all("[[:punct:]]", " "))
+
+kenya_shp[kenya_shp$county == "Nairobi City", "county"] <- "Nairobi"
+```
+
+```{r}
+#| label: fig-prev-map-stunting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 5
+#| fig-height: 6
+#| fig-cap: "Weighted prevalence of stunting among children 12-35 months by county"
+
+stunting_county <- county_stunting |>
+  mutate(county = v024,
+         prevalence = `I(stunted == "Stunted")`,
+         lb = ci_l, ub = ci_u) |>
+  select(county, prevalence, lb, ub) |>
+  mutate(name = names(attr(county, "labels")) |> str_to_title() |>
+           str_replace_all("[[:punct:]]", " "))
+
+merged_stunting <- kenya_shp |>
+  left_join(stunting_county, by = c("county" = "name")) |>
+  mutate(across(c(prevalence, lb, ub), ~ round(., 3) * 100))
+
+plot_map(merged_stunting, fill = prevalence,
+         breaks = c(0, 10, 20, 30, 40, 50),
+         labels = c("0-10", "11-20", "21-30", "31-40", "41-50"),
+         legend_title = "Prevalence (%)", subtitle = "Children 12-35 months",
+         palette = 7, direction = 1)
+
+ggsave("./Plots/Stunting_map.png", width = 8, height = 6, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-prev-map-immunisation
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 5
+#| fig-height: 6
+#| fig-cap: "Full-vaccination coverage among children 12-35 months, by county"
+
+immunn_county <- county_immunn |>
+  mutate(county = v024,
+         prevalence = `I(fully_vaccinated == "Fully vaccinated")`,
+         lb = ci_l, ub = ci_u) |>
+  select(county, prevalence, lb, ub) |>
+  mutate(name = names(attr(county, "labels")) |> str_to_title() |>
+           str_replace_all("[[:punct:]]", " "))
+
+merged_immunn <- kenya_shp |>
+  left_join(immunn_county, by = c("county" = "name")) |>
+  mutate(across(c(prevalence, lb, ub), ~ round(., 3) * 100))
+
+plot_map(merged_immunn, fill = prevalence,
+         breaks = c(0, 20, 40, 60, 80, 100),
+         labels = c("<20", "20-39.9", "40-59.9", "60-79.9", "80-100"),
+         legend_title = "Prevalence (%)", subtitle = NULL,
+         palette = 7, direction = -1)
+
+ggsave("./Plots/Vaccination_map.png", width = 8, height = 6, dpi = 500, bg = "white")
+```
+
+```{r}
+#| label: fig-prev-map-sba
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 5
+#| fig-height: 6
+#| fig-cap: "Skilled birth attendance coverage among children 12-35 months, by county"
+
+sba_county <- county_sba |>
+  mutate(county = v024, prevalence = `I(sba == "sba")`, lb = ci_l, ub = ci_u) |>
+  select(county, prevalence, lb, ub) |>
+  mutate(name = names(attr(county, "labels")) |> str_to_title() |>
+           str_replace_all("[[:punct:]]", " "))
+
+merged_sba <- kenya_shp |>
+  left_join(sba_county, by = c("county" = "name")) |>
+  mutate(across(c(prevalence, lb, ub), ~ round(., 3) * 100))
+
+plot_map(merged_sba, fill = prevalence,
+         breaks = c(40, 50, 70, 90, 100),
+         labels = c("40-49.9", "50-69.9", "70-89.9", "90-100"),
+         legend_title = "Prevalence (%)", subtitle = NULL,
+         palette = 7, direction = -1)
+
+ggsave("./Plots/Sba_map.png", width = 8, height = 6, dpi = 500, bg = "white")
+```
+
+### 12.4 Spatial autocorrelation — Moran's I and LISA
+
+```{r}
+#| label: fig-morans-i-lisa-stunting
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-width: 5
+#| fig-height: 6
+#| fig-cap: "LISA cluster map — local spatial autocorrelation of stunting prevalence by county"
+
+# Tests whether counties with high (or low) stunting prevalence cluster
+# geographically, rather than being randomly scattered.
+
+merged_stunting_valid <- merged_stunting |> filter(!is.na(prevalence))
+snap_tol <- if (sf::st_is_longlat(merged_stunting_valid)) 0.01 else 1000  # degrees vs metres
+
+nb <- poly2nb(merged_stunting_valid, queen = TRUE, snap = snap_tol)
+no_neighbours <- which(card(nb) == 0)
+
+if (length(no_neighbours) > 0) {
+  message("Dropping ", length(no_neighbours), " county(ies) with no neighbours even after snap tolerance: ",
+          paste(merged_stunting_valid$county[no_neighbours], collapse = ", "))
+  merged_stunting_sp <- merged_stunting_valid[-no_neighbours, ]
+  nb_sp <- poly2nb(merged_stunting_sp, queen = TRUE, snap = snap_tol)
+} else {
+  merged_stunting_sp <- merged_stunting_valid
+  nb_sp <- nb
+}
+
+stopifnot(length(nb_sp) > 0)
+lw <- nb2listw(nb_sp, style = "W", zero.policy = TRUE)
+
+morans_stunting <- moran.test(merged_stunting_sp$prevalence, lw, zero.policy = TRUE)
+morans_stunting
+
+local_moran <- localmoran(merged_stunting_sp$prevalence, lw, zero.policy = TRUE)
+
+merged_stunting_sp <- merged_stunting_sp |>
+  mutate(
+    local_i = local_moran[, "Ii"],
+    p_value = local_moran[, "Pr(z != E(Ii))"],
+    z_prevalence = scale(prevalence)[, 1],
+    z_lag = lag.listw(lw, prevalence, zero.policy = TRUE) |> scale() |> as.numeric(),
+    lisa_cluster = case_when(
+      p_value > 0.05 ~ "Not significant",
+      z_prevalence > 0 & z_lag > 0 ~ "High-High",
+      z_prevalence < 0 & z_lag < 0 ~ "Low-Low",
+      z_prevalence > 0 & z_lag < 0 ~ "High-Low",
+      z_prevalence < 0 & z_lag > 0 ~ "Low-High",
+      TRUE ~ "Not significant"))
+
+lisa_map <- merged_stunting_sp |>
+  ggplot() +
+  geom_sf(aes(fill = lisa_cluster), color = "gray30") +
+  scale_fill_manual(values = c(
+    "High-High" = "#813134", "Low-Low" = "navyblue",
+    "High-Low" = "#e6a0a3", "Low-High" = "#a0b8e6",
+    "Not significant" = "gray90")) +
+  labs(fill = "LISA cluster", subtitle = "Stunting prevalence (12-35 months)") +
+  theme_minimal(base_family = "Candara", base_size = 14) +
+  theme(axis.text = element_blank(), panel.grid = element_blank())
+
+lisa_map
+ggsave("./Plots/Stunting_LISA_cluster_map.png", plot = lisa_map,
+       width = 8, height = 6, dpi = 500, bg = "white")
+
+write_csv(st_drop_geometry(merged_stunting_sp) |> select(county, prevalence, local_i, p_value, lisa_cluster),
+          "Outputs/Tables/stunting_lisa_clusters.csv")
+```
+
+Interpretation: a significant positive Global Moran's I means stunting is
+spatially clustered (similar counties sit next to each other) rather than
+randomly distributed — this supports targeting multi-county High-High
+clusters rather than single counties in isolation (see Phase 15). The same
+block can be repeated on `merged_immunn` / `merged_sba` if those indicators
+also show worthwhile geographic clustering.
+
+## PHASE 12B — Small-area estimation (INLA) — stretch goal
+
+```{r}
+#| label: phase12b-inla-guard
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# This phase is the Task 2 "stretch goal" checklist item. It needs a
+# GEOCODED DHS cluster-level file (cluster GPS coordinates joined to
+# cluster-aggregated stunting counts/totals + covariate composition) — a
+# different data product from the KR individual-child recode used above.
+# It is guarded so the rest of the pipeline still runs end-to-end without it.
+inla_data_path <- "Data/Derived_data/stun_data_shp_utm.RData"
+run_inla <- file.exists(inla_data_path)
+message(if (run_inla) "INLA input found — running small-area estimation."
+        else paste0("INLA input not found at '", inla_data_path,
+                     "' — skipping Phase 12B (stretch goal). ",
+                     "Provide the geocoded cluster file to enable it."))
+```
+
+```{r}
+#| label: phase12b-inla-model
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| eval: !expr run_inla
+
+# Bayesian spatial (SPDE/INLA) model of childhood stunting prevalence,
+# producing a smoothed continuous prediction surface instead of one flat
+# estimate per county — useful where county-level sample sizes are too thin
+# for a stable direct estimate (classic small-area estimation motivation).
+pacman::p_load(sp, INLA, terra, viridis, scales, patchwork)
+
+grid_resolution_m  <- 5000               # prediction raster cell size, metres (UTM)
+mesh_max_edge       <- c(10000, 50000)   # inner / outer triangle edge length
+mesh_cutoff          <- 5000             # minimum distance between mesh points
+mesh_offset          <- c(10000, 50000)  # inner / outer extension buffer
+exceedance_threshold <- 0.20
+
+load(inla_data_path)  # provides `stun_data_shp_utm`
+
+dat <- stun_data_shp_utm |>
+  dplyr::select(
+    DHSID, ADM1NAME, LATNUM, LONGNUM, stunting, total, age_months_cat_rec,
+    child_sex_rec, parity_rec, age_mother_rec, marital_status_rec,
+    education_rec, employment_rec, wealth_status_rec, residence_rec,
+    utm_x, utm_y, geometry) |>
+  mutate(prevalence = stunting / total, cluster_id = factor(row_number()))
+
+coords <- cbind(dat$utm_x, dat$utm_y)
+
+# Observed cluster prevalence, before any modelling
+dat |>
+  ggplot() +
+  geom_sf(data = rKenyaCensus::KenyaCounties_SHP |> st_as_sf(), fill = "white") +
+  geom_sf(aes(colour = prevalence), alpha = 0.85, size = .55) +
+  scale_colour_viridis_c(name = "Observed\nprevalence", option = "F", labels = scales::percent) +
+  labs(title = "Observed stunting prevalence by DHS cluster") +
+  theme_minimal(base_family = "Candara", base_size = 12) +
+  theme(axis.text = element_blank(), axis.title = element_blank(),
+        panel.grid = element_blank(), plot.background = element_rect(fill = "gray96"))
+ggsave("./Plots/Stunting_observed_prev_map.png", width = 8, height = 6, dpi = 500, bg = "white")
+
+# Study-area boundary, in the same CRS/UTM as the cluster coordinates
+kenya <- rKenyaCensus::KenyaCounties_SHP |>
+  st_as_sf() |> summarise() |> st_transform(st_crs(dat))
+
+# Boundary-aware triangulated mesh over Kenya + a buffer, used by SPDE to
+# approximate a continuous spatial Gaussian random field
+kenya_boundary <- inla.sp2segment(sf::as_Spatial(kenya))
+mesh <- inla.mesh.2d(loc = coords, boundary = kenya_boundary,
+                      max.edge = mesh_max_edge, cutoff = mesh_cutoff, offset = mesh_offset)
+plot(mesh, main = "Mesh with cluster locations")
+points(coords, col = "red", pch = 16, cex = 0.5)
+
+# Penalised-complexity SPDE prior for the spatial field
+spde <- inla.spde2.pcmatern(mesh, prior.range = c(50000, 0.5), prior.sigma = c(1, 0.01))
+index <- inla.spde.make.index(name = "spatial", n.spde = spde$n.spde)
+A <- inla.spde.make.A(mesh, loc = coords)
+
+# Estimation stack: binomial(stunting successes / total children) per
+# cluster, plus a cluster-level IID nugget on top of the spatial field
+stack <- inla.stack(
+  data = list(y = dat$stunting, Ntrials = dat$total),
+  A = list(A, 1),
+  effects = list(
+    spatial = index,
+    data.frame(
+      intercept = 1,
+      wealth    = factor(dat$wealth_status_rec),
+      education = factor(dat$education_rec),
+      residence = factor(dat$residence_rec),
+      child_age = factor(dat$age_months_cat_rec),
+      sex       = factor(dat$child_sex_rec),
+      parity    = factor(dat$parity_rec),
+      cluster_id = dat$cluster_id)),
+  tag = "est")
+
+formula <- y ~ 0 + intercept + wealth + education + residence + child_age + sex + parity +
+  f(spatial, model = spde) + f(cluster_id, model = "iid")
+
+fit <- inla(formula, family = "binomial", Ntrials = dat$total,
+            data = inla.stack.data(stack),
+            control.predictor = list(A = inla.stack.A(stack), compute = TRUE),
+            control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
+summary(fit)
+
+# Diagnostics
+cat("Number of CPO failures:", sum(fit$cpo$failure > 0, na.rm = TRUE), "\n")
+spde_result <- inla.spde2.result(fit, "spatial", spde)
+cat("Posterior median spatial range (km):",
+    round(inla.qmarginal(0.5, spde_result$marginals.range.nominal[[1]]) / 1000, 1), "\n")
+cat("Posterior median spatial sigma:",
+    round(inla.qmarginal(0.5, spde_result$marginals.variance.nominal[[1]])^0.5, 3), "\n")
+
+idx_est <- inla.stack.index(stack, "est")$data
+fitted_est <- fit$summary.fitted.values[idx_est, ]
+
+ggplot(data.frame(observed = dat$prevalence, fitted = fitted_est$mean), aes(observed, fitted)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, lty = 2, colour = "grey40") +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(subtitle = "Fitted vs. observed cluster prevalence", x = "Observed",
+       y = "Model fitted (posterior mean)") +
+  theme_bw(base_family = "Candara", base_size = 12) + theme(panel.grid = element_blank())
+ggsave("./Plots/fitted_vs_observed.png", width = 5, height = 5, dpi = 500, bg = "white")
+
+# Prediction grid over Kenya
+kenya_vect <- terra::vect(kenya)
+r_template <- terra::rast(kenya_vect, resolution = grid_resolution_m)
+r_mask <- terra::rasterize(kenya_vect, r_template, field = 1)
+idx_in <- which(!is.na(terra::values(r_mask)))
+coords_pred <- terra::xyFromCell(r_mask, idx_in)
+n_pred <- nrow(coords_pred)
+cat("Number of prediction grid cells inside Kenya:", n_pred, "\n")
+A_pred <- inla.spde.make.A(mesh, loc = coords_pred)
+
+# Individual/household covariates don't have a well-defined value "at a
+# pixel" — we predict for a single population-weighted reference-child
+# profile applied uniformly, so all spatial pattern in the output map comes
+# from the estimated spatial field, not an artificial per-covariate mosaic.
+get_weighted_mode <- function(level_vec, weight_vec) {
+  agg <- tapply(weight_vec, level_vec, sum, na.rm = TRUE)
+  names(agg)[which.max(agg)]
+}
+ref_levels <- list(
+  wealth    = get_weighted_mode(dat$wealth_status_rec, dat$total),
+  education = get_weighted_mode(dat$education_rec, dat$total),
+  residence = get_weighted_mode(dat$residence_rec, dat$total),
+  child_age = get_weighted_mode(dat$age_months_cat_rec, dat$total),
+  sex       = get_weighted_mode(dat$child_sex_rec, dat$total),
+  parity    = get_weighted_mode(dat$parity_rec, dat$total))
+print(ref_levels)
+
+pred_data <- data.frame(
+  intercept = 1,
+  wealth    = factor(rep(ref_levels$wealth, n_pred), levels = levels(factor(dat$wealth_status_rec))),
+  education = factor(rep(ref_levels$education, n_pred), levels = levels(factor(dat$education_rec))),
+  residence = factor(rep(ref_levels$residence, n_pred), levels = levels(factor(dat$residence_rec))),
+  child_age = factor(rep(ref_levels$child_age, n_pred), levels = levels(factor(dat$age_months_cat_rec))),
+  sex       = factor(rep(ref_levels$sex, n_pred), levels = levels(factor(dat$child_sex_rec))),
+  parity    = factor(rep(ref_levels$parity, n_pred), levels = levels(factor(dat$parity_rec))))
+
+stack_pred <- inla.stack(data = list(y = NA), A = list(A_pred, 1),
+                          effects = list(spatial = index, pred_data), tag = "prediction")
+stack_full <- inla.stack(stack, stack_pred)
+
+# Refit with the prediction stack appended
+fit_pred <- inla(formula, family = "binomial", Ntrials = c(dat$total, rep(1, nrow(pred_data))),
+                  data = inla.stack.data(stack_full),
+                  control.predictor = list(A = inla.stack.A(stack_full), compute = TRUE, link = 1))
+
+idx_pred <- inla.stack.index(stack_full, tag = "prediction")$data
+pred <- fit_pred$summary.fitted.values[idx_pred, ]
+
+# Exceedance probability: P(prevalence > threshold) at each grid cell
+exceed_prob <- vapply(fit_pred$marginals.fitted.values[idx_pred],
+                       function(m) 1 - inla.pmarginal(exceedance_threshold, m), numeric(1))
+
+fill_raster <- function(template, idx, vals) {
+  out <- template
+  v <- rep(NA_real_, terra::ncell(template))
+  v[idx] <- vals
+  terra::values(out) <- v
+  out
+}
+r_mean    <- fill_raster(r_mask, idx_in, pred$mean)
+r_sd      <- fill_raster(r_mask, idx_in, pred$sd)
+r_lower   <- fill_raster(r_mask, idx_in, pred$`0.025quant`)
+r_upper   <- fill_raster(r_mask, idx_in, pred$`0.975quant`)
+r_exceed  <- fill_raster(r_mask, idx_in, exceed_prob)
+r_ciwidth <- r_upper - r_lower
+
+pred_stack <- c(r_mean, r_sd, r_lower, r_upper, r_exceed, r_ciwidth)
+names(pred_stack) <- c("mean", "sd", "lower95", "upper95", "p_exceed", "ci_width")
+terra::writeRaster(pred_stack, "./Data/Derived_data/stunting_prediction_surface.tif", overwrite = TRUE)
+
+df_mean <- as.data.frame(r_mean, xy = TRUE, na.rm = TRUE); names(df_mean)[3] <- "prevalence"
+
+ggplot() +
+  geom_raster(data = df_mean, aes(x, y, fill = prevalence)) +
+  geom_sf(data = kenya, fill = NA, colour = "white", linewidth = 0.4, inherit.aes = FALSE) +
+  scale_fill_viridis_c(name = "Stunting\nprevalence", option = "H",
+                        labels = scales::percent_format(accuracy = 1),
+                        limits = c(0, max(df_mean$prevalence, na.rm = TRUE))) +
+  coord_sf(crs = st_crs(kenya), expand = FALSE) +
+  labs(subtitle = "Posterior mean, spatial (SPDE/INLA) model, reference covariate profile",
+       caption = "Model: binomial-SPDE with cluster-level nugget. Grid: 5 km.") +
+  theme_minimal(base_family = "Candara", base_size = 13) +
+  theme(axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank(),
+        plot.background = element_rect(fill = "gray96"), panel.grid = element_blank(),
+        plot.title = element_text(face = "bold"))
+ggsave("./Plots/Stunting_predicted_prevalence.png", width = 5, height = 5, dpi = 500, bg = "white")
+```
+
+## PHASE 13 — MCH Vulnerability Index
+
+```{r}
+#| label: phase13-vulnerability-index
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+county_stunting_rate <- svyby(~stun, ~v024, stunting_survey, svymean, na.rm = TRUE) |>
+  rename(county_code = v024, stunting_rate = stun)
+
+county_nonimmun_rate <- svyby(~I(1 - fully_vacc), ~v024, immunn_survey, svymean, na.rm = TRUE) |>
+  rename(county_code = v024, nonimmun_rate = 2)
+
+county_nonsba_rate <- svyby(~I(1 - sba_num), ~v024, df_sba_survey, svymean, na.rm = TRUE) |>
+  rename(county_code = v024, nonsba_rate = 2)
+
+# NEW — county-level poverty concentration (share of children in the two
+# poorest quintiles), used as the wealth-equity input to Task 4 v2 below.
+county_poverty_rate <- df |>
+  group_by(v024) |>
+  summarise(poverty_rate = weighted.mean(wealth_q %in% c(1, 2), wt, na.rm = TRUE), .groups = "drop") |>
+  rename(county_code = v024)
+
+vulnerability_df <- county_stunting_rate |>
+  select(county_code, stunting_rate) |>
+  left_join(county_nonimmun_rate |> select(county_code, nonimmun_rate), by = "county_code") |>
+  left_join(county_nonsba_rate |> select(county_code, nonsba_rate), by = "county_code") |>
+  left_join(county_poverty_rate, by = "county_code") |>
+  mutate(
+    z_stunting = scale(stunting_rate)[, 1],
+    z_nonimmun = scale(nonimmun_rate)[, 1],
+    z_nonsba   = scale(nonsba_rate)[, 1],
+    z_poverty  = scale(poverty_rate)[, 1],
+    vulnerability_index_A = z_stunting + z_nonimmun + z_nonsba)  # v2 core: 3 outcomes, equal weight
+
+# PCA-based weights as a sensitivity check on the equal-weighting assumption
+pca_input <- vulnerability_df |> select(z_stunting, z_nonimmun, z_nonsba)
+pca_fit <- prcomp(pca_input, center = FALSE, scale. = FALSE)
+vulnerability_df$vulnerability_index_B <- predict(pca_fit)[, 1]
+
+write_csv(vulnerability_df, "Outputs/Tables/vulnerability_index.csv")
+```
+
+## PHASE 14 — Intervention targeting: priority ranking v1 and v2
+
+### 14.1 v1 — stunting-only prioritization (original approach, kept for comparison)
+
+```{r}
+#| label: phase14-priority-v1
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Reproduces the original "v1 county prioritization from stunting data"
+# checklist item as a standalone quartile ranking, so it's visible exactly
+# how much the v2 composite (below) changes the picture.
+priority_v1 <- county_stunting_rate |>
+  mutate(
+    priority_v1 = case_when(
+      stunting_rate >= quantile(stunting_rate, .75) ~ "Critical",
+      stunting_rate >= quantile(stunting_rate, .50) ~ "High",
+      stunting_rate >= quantile(stunting_rate, .25) ~ "Moderate",
+      TRUE ~ "Low"),
+    county_name = haven::as_factor(county_code)) |>
+  select(county_name, county_code, stunting_rate, priority_v1)
+
+write_csv(priority_v1, "Outputs/Tables/priority_counties_v1_stunting_only.csv")
+```
+
+### 14.2 v2 — multi-indicator + wealth-quintile composite prioritization
+
+```{r}
+#| label: phase14-priority-v2
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+# Folds in immunisation, SBA, AND wealth-quintile poverty concentration —
+# closes the "v2: fold in immunisation/SBA/wealth-quintile data once
+# available" checklist item.
+vulnerability_df_v2 <- vulnerability_df |>
+  mutate(vulnerability_index_v2 = z_stunting + z_nonimmun + z_nonsba + z_poverty)
+
+priority_df <- vulnerability_df_v2 |>
+  mutate(
+    priority_v2 = case_when(
+      vulnerability_index_v2 >= quantile(vulnerability_index_v2, .75) ~ "Critical",
+      vulnerability_index_v2 >= quantile(vulnerability_index_v2, .50) ~ "High",
+      vulnerability_index_v2 >= quantile(vulnerability_index_v2, .25) ~ "Moderate",
+      TRUE ~ "Low"))
+
+write_csv(priority_df, "Outputs/Tables/priority_counties_v2_multi_indicator.csv")
+```
+
+### 14.3 Ranking counties by combined burden (three dimensions)
+
+```{r}
+#| label: fig-top-counties-ranking
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+#| fig-cap: "Top 10 counties ranked by combined burden — stunting, non-immunisation, and non-SBA"
+
+# For each county, count how many of the THREE core dimensions sit in the
+# worst tertile nationally — a simple, transparent companion reading of the
+# continuous vulnerability_index_A (Phase 13). Poverty concentration is
+# intentionally excluded here (it's still folded into the separate v2
+# priority classification in 14.2 above) — this ranking stays scoped to the
+# three outcome indicators only, matching the requested figure.
+county_flags <- vulnerability_df |>
+  mutate(
+    stunting_flag = as.integer(stunting_rate >= quantile(stunting_rate, 2/3)),
+    nonimmun_flag = as.integer(nonimmun_rate >= quantile(nonimmun_rate, 2/3)),
+    nonsba_flag   = as.integer(nonsba_rate   >= quantile(nonsba_rate, 2/3)),
+    n_indicators_flagged = stunting_flag + nonimmun_flag + nonsba_flag)
+
+# NEW — make it explicit WHICH indicator each county is flagged/not-flagged
+# on, not just the count. A county can rank near the top of the continuous
+# vulnerability_index_A while only being flagged on 2 of 3 indicators: its
+# two bad indicators can be severe enough to push the SUM of z-scores high,
+# even if the third indicator isn't bad enough to land that county in the
+# worst national tertile on ITS OWN. The flag count and the continuous index
+# are answering different questions (how many indicators are in the worst
+# third, vs. how bad is the combined severity) and are allowed to disagree.
+indicator_names <- c(stunting_flag = "Stunting", nonimmun_flag = "Non-immunisation",
+                      nonsba_flag = "Non-SBA")
+
+flag_to_text <- function(stunting_flag, nonimmun_flag, nonsba_flag) {
+  flags <- c(stunting_flag, nonimmun_flag, nonsba_flag)
+  names(flags) <- indicator_names
+  flagged <- names(flags)[flags == 1]
+  not_flagged <- names(flags)[flags == 0]
+  tibble(
+    indicators_flagged = paste(flagged, collapse = ", "),
+    indicator_not_flagged = if (length(not_flagged) == 0) "None (flagged on all 3)"
+                            else paste(not_flagged, collapse = ", "))
+}
+
+flag_text <- pmap_dfr(list(county_flags$stunting_flag, county_flags$nonimmun_flag,
+                            county_flags$nonsba_flag), flag_to_text)
+county_flags <- bind_cols(county_flags, flag_text)
+
+top_counties <- county_flags |>
+  arrange(desc(n_indicators_flagged), desc(vulnerability_index_A)) |>
+  mutate(county_name = haven::as_factor(county_code)) |>
+  select(county_name, stunting_rate, nonimmun_rate, nonsba_rate,
+         n_indicators_flagged, indicators_flagged, indicator_not_flagged,
+         vulnerability_index_A)
+
+write_csv(top_counties, "Outputs/Tables/top_counties_ranked.csv")
+
+top_counties |>
+  slice_head(n = 10) |>
+  ggplot(aes(x = reorder(county_name, vulnerability_index_A), y = vulnerability_index_A,
+             fill = factor(n_indicators_flagged))) +
+  geom_col() +
+  geom_text(aes(label = if_else(n_indicators_flagged < 3,
+                                 paste0("excl. ", indicator_not_flagged), "")),
+            hjust = 1.05, size = 3, family = "Candara", color = "white") +
+  coord_flip() +
+  labs(x = NULL, y = "Vulnerability index (equal-weight, 3 indicators)",
+       fill = "# indicators\nin worst tertile") +
+  theme_bw(base_family = "Candara", base_size = 13)
+
+ggsave("./Plots/Top10_counties_vulnerability.png", width = 8, height = 6, dpi = 500, bg = "white")
+```
+
+## PHASE 15 — Policy recommendations
+
+Grounded in what the pipeline actually returned on this run (Phases 9-14),
+rather than a hypothetical read of results not yet seen:
+
+1. **Target multi-indicator counties first.** `top_counties_ranked.csv`
+   (Phase 14.3) identifies counties flagged on all three core outcome
+   indicators (stunting, non-immunisation, non-SBA) simultaneously — these
+   are where an integrated MCH package (nutrition + immunisation outreach +
+   facility-delivery support together) has the most leverage per county
+   visited, rather than three separate single-indicator programmes. The
+   separate v2 priority classification (Phase 14.2, `priority_counties_
+   v2_multi_indicator.csv`) additionally folds in poverty concentration if
+   a wealth-informed view of the same ranking is also needed.
+2. **Address the wealth gradient directly, not just regionally — and treat
+   the three indicators differently.** The association tests (Phase 10)
+   and SII/RII (Phase 11.2) both point the same way: stunting and
+   non-immunisation are concentrated among poorer households (negative
+   SII/RII — the burden runs downhill as wealth rises), while skilled
+   birth attendance shows the opposite pattern (positive SII/RII — access
+   runs uphill with wealth, i.e. richer households are more likely to get
+   it). A single "target the poor" lever will not close the SBA gap the
+   same way it would help stunting and immunisation; facility-access and
+   cost barriers specific to delivery care need their own response.
+   Immunisation's association with residence was **not** statistically
+   significant in this run (Phase 10), while its association with wealth
+   was — so, on this evidence, wealth-targeted subsidies are a better bet
+   for closing the immunisation gap than urban/rural-targeted outreach
+   alone.
+3. **Spatial clustering of stunting was not statistically significant in
+   this run.** Global Moran's I on county stunting prevalence (Phase 12.4)
+   was not significant (I = 1.23, p = 0.109 — see that phase's output),
+   meaning this dataset does not give strong evidence that high-stunting
+   counties sit next to other high-stunting counties more than chance
+   would predict. On this evidence, county-by-county targeting (as in
+   Phase 14) is better supported than assuming multi-county corridor
+   clusters; the LISA map is still worth re-checking each time the
+   pipeline is re-run on updated data, since clustering could emerge or
+   fade between survey rounds.
+4. **Small-area estimation (Phase 12B) was not run in this pass** — the
+   geocoded DHS cluster file it needs (`stun_data_shp_utm.RData`) was not
+   available, so Phase 12B's guard skipped it rather than producing a
+   surface. Where county-level sample sizes are visibly thin (check `n`
+   per county behind `county_stunting_with_CI.csv`), that raw estimate's
+   uncertainty should be read cautiously; obtaining the geocoded cluster
+   file and re-running Phase 12B would let the exceedance-probability and
+   CI-width layers replace that caution with an actual quantified surface.
+5. **v1 vs v2 divergence is itself informative.** Compare
+   `priority_counties_v1_stunting_only.csv` against
+   `priority_counties_v2_multi_indicator.csv` — counties that rank high in
+   v1 but drop in v2 are stunting-specific problems; counties that rise in
+   v2 but weren't visible in v1 are broader multi-indicator/poverty
+   problems that a stunting-only lens would have missed entirely.
+
+## PHASE 16 — Ethics, limitations & reproducibility
+
+**Data protection & ethics.** The KDHS 2022 data are secondary,
+de-identified, publicly available survey data released under ICF/DHS
+Program's standard data use agreement; no household or individual
+identifiers are present, and re-identification attempts (e.g. joining to
+other datasets to re-identify respondents) are prohibited under that
+agreement. Original DHS fieldwork obtained informed consent and ethical
+clearance (Kenya Medical Research Institute — KEMRI — and ICF Institutional
+Review Board). Processing of this data in Kenya should also be considered
+against the Kenya Data Protection Act (2019) if any output (e.g. a county
+priority score) is ever linked back to identifiable individuals in a
+downstream application — this pipeline as written never does that; every
+output is aggregated at county, wealth-quintile, or subgroup level.
+
+**Limitations.**
+- KDHS 2022 is cross-sectional — the associations in Phase 10 are not
+  causal, and the age-based pattern in Phase 9.5 is a within-wave proxy for
+  a trend, not a real longitudinal trend.
+- Self-reported vaccination cards vs. maternal recall (`h`-series
+  variables) carry recall bias that this pipeline does not attempt to
+  correct for.
+- County-level spatial autocorrelation (Phase 12.4) uses areal
+  (county-average) data, which is subject to the modifiable areal unit
+  problem (MAUP) — cluster boundaries would shift if analysed at a finer or
+  coarser administrative level. The INLA surface (Phase 12B) partially
+  mitigates this by modelling a continuous field instead of one flat value
+  per county, but is itself sensitive to mesh/prior choices (documented in
+  that phase's settings block).
+- Stunting, immunisation, and SBA are all restricted to 12-35 months —
+  note that this is narrower than the WHO/DHS standard 6-59 month stunting
+  reporting window, so the stunting prevalence here is not directly
+  comparable to headline national stunting figures published elsewhere on
+  that wider band.
+- Wealth is shown as a collapsed 3-category variable (Low/Middle/High)
+  in every plot and table in Phases 8, 9.4, and 11.0 — this trades some
+  resolution (a poorest-vs-poorer or richer-vs-richest gap would not be
+  visible) for a cleaner adjusted-OR table with Low as a single reference
+  category, matching the mate's convention. The concentration curves and
+  SII/RII (Phase 11.1-11.2) still use the full continuous wealth score
+  (`wealth_cont`), so the finer gradient is not lost from the analysis
+  entirely — just from the categorical plots specifically.
+- The v2 vulnerability index (Phase 14.2) uses equal weighting across four
+  dimensions by default; the PCA-based alternative weighting (Phase 13,
+  `vulnerability_index_B`) is provided as a sensitivity check, not a
+  replacement — report both if they disagree materially on which counties
+  land in the top decile.
+
+**Roles**: Data acquisition, cleaning, segmentation, descriptive/equity/
+spatial analysis, small-area estimation, vulnerability index, priority
+ranking, report writing, policy recommendations, and the ethics section
+(all phases) — Elphas Abok.
+
+**Reproducibility.** `sessionInfo()` is captured at the end of a full run;
+all derived data is written to `Data/Derived_data/`, all tables to
+`Outputs/Tables/`, all figures to `Plots/`, so the whole pipeline's outputs
+are traceable without re-running from raw data.
+
+```{r}
+#| label: phase16-session-info
+#| message: false
+#| warning: false
+#| cache: false
+#| include: true
+
+writeLines(capture.output(sessionInfo()), "Outputs/sessionInfo.txt")
+```
