@@ -24,7 +24,6 @@ Packages and data
 #| cache: false
 #| include: true
 
-rm(list = ls())
 pacman::p_load(
   tidyverse, haven, labelled, epiDisplay, survey,
   gtsummary, extrafont, flextable, PrevMap)
@@ -295,7 +294,7 @@ tbl_uvregression(
   autofit() |> 
   flextable::font(fontname = "Candara", part = "all") |> 
   flextable::fontsize(size = 11, part = "all") |> 
-  align(
+  flextable::align(
     j = c(2, 3, 4), 
     align = c("left", "left", "right"), 
     part = "all")
@@ -333,7 +332,7 @@ mult_model_stunting <- tbl_regression(
   autofit() |>
   font(fontname = "Candara", part = "all") |>
   fontsize(size = 11, part = "all") |>
-  align(
+  flextable::align(
     j = c(2, 3),
     align = c("left", "right"),
     part = "all")
@@ -348,9 +347,6 @@ mult_model_stunting$body$dataset |>
       c("Household wealth status", "Low", "Middle", "High")),
 
     "./Data/Derived_estimates/dhs_stunting_WI_adjusted_OR.csv")
-
-
-
 ```
 
 
@@ -618,7 +614,7 @@ Checking for multicollinearity
 
 library(ggcorrplot)
 
-ggcorrplot(
+gg_cor_stunting <- ggcorrplot(
   cor(
     collapsed_stunting_data[, c(
       "age_months_cat_rec", "child_sex_rec", "parity_rec",
@@ -626,13 +622,16 @@ ggcorrplot(
         "employment_rec", "wealth_status_rec", "residence_rec")],
     use = "pairwise.complete.obs"),
   type = "lower",
-    ggtheme = ggplot2::theme_bw(base_family = "Candara") +
+  show.legend = F,
+  ggtheme = ggplot2::theme_bw(base_family = "Candara") +
          theme(panel.grid = element_blank()),
     hc.order = F,
     show.diag = F,
     outline.col = "white",
     lab = TRUE,
     legend.title = "Correlation")
+
+gg_cor_stunting
 
 ```
 
@@ -818,7 +817,7 @@ stunting_df_clean <- stunting_df %>%
 par(bty = "o")
 
 
-variog <- spat.corr.diagnostic(
+variog_stunting <- spat.corr.diagnostic(
   stunting ~ age_months_cat_rec + child_sex_rec + 
     parity_rec + age_mother_rec + marital_status_rec +
     education_rec + employment_rec + wealth_status_rec +
@@ -829,5 +828,42 @@ variog <- spat.corr.diagnostic(
   lse.variogram = T,
   data = stunting_df_clean)
 
+variog_stunting
+
+pars   <- variog_stunting$lse.variogram
+sigma2 <- pars["sigma^2"]
+phi    <- pars["phi"]
+nugget <- pars["tau^2"]
+
+variog_df <- data.frame(
+  distance = variog_stunting$distance.bins,
+  obs      = variog_stunting$obs.variogram,
+  lower    = variog_stunting$lower.lim,
+  upper    = variog_stunting$upper.lim) |>
+  mutate(
+    fitted = nugget + sigma2 * (1 - exp(-distance / phi)))
+
+p_variog_stunting <- 
+  ggplot(variog_df, aes(x = distance)) +
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+     fill = "grey80", alpha = 0.5) +
+  geom_line(
+    aes(y = obs), color = "black", linewidth = 0.8) +
+  geom_point(
+    aes(y = obs), color = "black", size = 2) +
+  geom_line(
+    aes(y = fitted), color = "blue", 
+    linetype = "dashed", linewidth = 0.8) +
+  labs(
+    x = "Spatial distance",
+    y = "Variogram",
+    subtitle = "Stunting") +
+  theme_bw(base_family = "Candara", base_size = 14) + 
+  theme(
+    plot.subtitle = element_text(hjust = .5),
+    panel.grid = element_blank())
+
+p_variog_stunting
 ```
 
