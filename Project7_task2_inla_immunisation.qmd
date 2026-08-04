@@ -86,7 +86,7 @@ immunisation_observed_cluster <- dat |>
       alpha = 0.85,
       size = .55) +
   scale_colour_viridis_c(
-    name = "Prevalence", 
+    name = "", 
     option = "F",
     labels = scales::percent) +
   scale_size_continuous(
@@ -98,7 +98,7 @@ immunisation_observed_cluster <- dat |>
   theme(
    axis.text = element_blank(),
    axis.title = element_blank(),
-   plot.subtitle = element_text(hjust = .55, vjust = -15),
+   plot.subtitle = element_text(hjust = .55, vjust = -5),
    panel.grid = element_blank(),
    plot.background = element_rect(fill = "gray96"))
 
