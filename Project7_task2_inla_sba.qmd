@@ -100,7 +100,7 @@ sba_observed_cluster <- dat |>
   theme(
    axis.text = element_blank(),
    axis.title = element_blank(),
-   plot.subtitle = element_text(hjust = .75, vjust = -10),
+   plot.subtitle = element_text(hjust = .80, vjust = -10),
    panel.grid = element_blank(),
    plot.background = element_rect(fill = "gray96"))
 
@@ -569,7 +569,4 @@ ggsave(
   height = 8,
   dpi = 500,
   bg = "white")
-
-
-
 ```
