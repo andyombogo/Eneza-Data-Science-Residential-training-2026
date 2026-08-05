@@ -1,33 +1,30 @@
-This repository hosts materials for the ENEZA training 2026 edition.
+README
 
-# Eneza Data Science Residential training 2026 - Mini Projects
-Mini-projects for the residential training. As part of the Eneza Residential training 2026, you will collaboratively work on mini-projects in groups of 4 - 6.
+Project Details:
 
-## Projects
+Project code and name: Project 7 - Predicting maternal & child health outcomes.
+Project task code and name: Task 2 - Describe how Kenyan maternal/child indicators (stunting, skilled birth attendance, immunisation) vary by region and wealth quintile.
 
-| #   | Project                                                   | Field             
-| --- | --------------------------------------------------------- | ----------------- 
-| 1   | [Malaria parasite genomic surveillance](Project_1.md)     | Genomics          
-| 2   | [Single-cell transcriptomics of disease](Project_2.md)    | Transcriptomics          
-| 3   | [Tuberculosis drug resistance from genomes](Project_3.md) | Genomics          
-| 4   | [HIV drug resistance from sequences](Project_4.md)        | Bioinformatics/ML 
-| 5   | [Clinical text mining (NLP)](Project_5.md)                | NLP               
-| 6   | [Cancer subtype from gene expression](Project_6.md)       | Transcriptomics/ML       
-| 7   | [Maternal & child health outcomes](Project_7.md)          | Data science/ML   
-| 8   | [Gut microbiome signatures of disease](Project_8.md)      | Metagenomics      
-| 9   | [Biomedical literature mining](Project_10.md)             | NLP 
+Team Members and Affiliations:
 
-To select a project, please comment on the issue and why you'd like to tackle the mini-project. Select at least two, and specify your First, Second and Third choice. Kindly also remember to include your institution (where you come from).
+1. Elphas Abok - ICIPE, Nairobi
+2. Kevinson Mwangi - Institute for Human Development, Aga Khan University, Nairobi
 
-# Expectations
-Work collaboratively on the project. In your report, you need to state the role played by each group member.
+Approach:
 
-Collaborate via Git & GitHub, making use of the Git Workflow.
+1. Data: KDHS 2022 KR Records for children 6-59 months - Data was restricted to the youngest child, 6-59 months, living with the respondent
 
-Assign tasks to group members using GitHub issues and learn from each other. Every group member must be knowledgeable of the whole group's work.
+2. EDA: 
+	a. Generate weighted prevalence of stunting, skilled birth attendance, and immunization at the national and sub-national levels
+	b. Plot these subnational prevalence estimates on a map, showing areas that may need resource prioritization
 
-A reproducible workflow, Jupyter Notebooks, or Rmarkdown notebooks, together with computational environment should accompany your submission.
+	c. Generate concentration curves showing how stunting, skilled birth attendance, and immunization vary by wealth quantiles
 
-Document your scripts in a nice and informative way. Your scripts, programs, workflows, etc, will be reviewed as a critical part of the project assessment. Script your data retrieval and remember not to commit raw data.
+3. Models
 
-Your writeup should be complete with visualizations.
+	a. Assess maternal and child factors associated with child stunting, skilled birth attendance, and immunization coverage and build predicted probabilities of stunting, skilled birth attendance, and immunization coverage and map these on fine spatial resolution using small area estimation techniques/MBG
+	
+
+
+
+
