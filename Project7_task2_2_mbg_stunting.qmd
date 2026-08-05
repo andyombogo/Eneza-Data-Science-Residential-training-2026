@@ -828,7 +828,6 @@ variog_stunting <- spat.corr.diagnostic(
   lse.variogram = T,
   data = stunting_df_clean)
 
-variog_stunting
 
 pars   <- variog_stunting$lse.variogram
 sigma2 <- pars["sigma^2"]
