@@ -479,7 +479,7 @@ terra::writeRaster(
 
 ```
 
-# MAPS
+# MAPS-
 
 ```{r}
 #| label: maps
