@@ -497,10 +497,22 @@ names(df_ciw)[3] <- "ci_width"
 #df_exceed <- as.data.frame(r_exceed,  xy = TRUE, na.rm = TRUE)
 #names(df_exceed)[3] <- "p_exceed"
 
+
+kenya_counties <- rKenyaCensus::KenyaCounties_SHP |>
+  st_as_sf() |>
+  st_transform(st_crs(dat)) 
+
+
 immunisation_predicted_probs <- ggplot() +
   geom_raster(
     data = df_mean, 
     aes(x, y, fill = prevalence)) +
+  geom_sf(                            
+    data = kenya_counties,
+    fill = NA,
+    colour = "grey60",
+    linewidth = 0.2,
+    inherit.aes = FALSE) +
   geom_sf(
     data = kenya, 
     fill = NA, 
