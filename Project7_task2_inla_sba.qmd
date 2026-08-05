@@ -549,7 +549,7 @@ ggsave(
 ```
 
 
-## Combining the plots
+## Combining the plots-
 
 
 ```{r}
@@ -564,7 +564,7 @@ ggsave(
   (stunting_observed_cluster | immunisation_observed_cluster | sba_observed_cluster),
   width = 12,
   height = 12,
-  dpi = 500,
+  dpi = 501,
   bg = "white")
 
 
@@ -573,7 +573,7 @@ ggsave(
   (diagnostics_stunting | diagnostics_immunisation | diagnostics_sba),
   width = 12,
   height = 8,
-  dpi = 500,
+  dpi = 501,
   bg = "white")
 
 
@@ -582,6 +582,6 @@ ggsave(
   (stunting_predicted_probs | immunisation_predicted_probs | sba_predicted_probs),
   width = 12,
   height = 8,
-  dpi = 500,
+  dpi = 501,
   bg = "white")
 ```
