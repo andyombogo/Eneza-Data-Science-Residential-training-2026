@@ -67,6 +67,7 @@ coords <- cbind(dat$utm_x, dat$utm_y)
 
 ```
 
+
 ```{r}
 #| label: quick-eda
 #| message: false
@@ -178,6 +179,7 @@ A <- inla.spde.make.A(mesh, loc = coords)
 
 
 # ESTIMATION STACK  
+
 ```{r}
 #| label: estimation-stack
 #| message: false
@@ -231,7 +233,9 @@ formula <- y ~
 
 ```
 
+
 # FIT THE ESTIMATION MODEL
+
 ```{r}
 #| label: model-fitting
 #| message: false
@@ -439,8 +443,7 @@ pred <- fit_pred$summary.fitted.values[idx_pred, ]
 exceed_prob <- vapply(
   fit_pred$marginals.fitted.values[idx_pred],
   function(m) 1 - inla.pmarginal(exceedance_threshold, m),
-  numeric(1)
-)
+  numeric(1))
 
 ```
 
@@ -497,10 +500,21 @@ names(df_ciw)[3] <- "ci_width"
 #df_exceed <- as.data.frame(r_exceed,  xy = TRUE, na.rm = TRUE)
 #names(df_exceed)[3] <- "p_exceed"
 
+kenya_counties <- rKenyaCensus::KenyaCounties_SHP |>
+  st_as_sf() |>
+  st_transform(st_crs(dat)) 
+
+
 stunting_predicted_probs <- ggplot() +
   geom_raster(
     data = df_mean, 
     aes(x, y, fill = prevalence)) +
+  geom_sf(                            
+    data = kenya_counties,
+    fill = NA,
+    colour = "grey60",
+    linewidth = 0.2,
+    inherit.aes = FALSE) +
   geom_sf(
     data = kenya, 
     fill = NA, 
