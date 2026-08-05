@@ -62,11 +62,12 @@ st.markdown(
 
 4. **Wealth equity cuts in different directions by indicator.** Stunting
    (concentration index {conc['indicators'][0]['concentration_index']:+.2f})
-   and incomplete immunisation ({conc['indicators'][1]['concentration_index']:+.2f})
-   concentrate among **poorer** households; skilled birth attendance
-   ({conc['indicators'][2]['concentration_index']:+.2f}) concentrates
-   heavily among **wealthier** households — the largest wealth gap of the
-   three. See Wealth Analysis for the full picture.
+   concentrates among **poorer** households; full immunisation
+   ({conc['indicators'][1]['concentration_index']:+.2f}) and skilled birth
+   attendance ({conc['indicators'][2]['concentration_index']:+.2f}) both
+   concentrate among **wealthier** households — SBA's gap is by far the
+   largest of the three, immunisation's the smallest. See Wealth Analysis
+   for the full picture.
 """
 )
 
@@ -87,10 +88,10 @@ st.markdown(
 **Immunisation**
 - At {immun_pct:.1f}% national full-vaccination coverage, roughly half of
   children 12–35 months are missing at least one scheduled dose. Because
-  incomplete immunisation concentrates among poorer households
-  ({conc['indicators'][1]['concentration_index']:+.2f}), demand-side
-  barriers (cost, distance, awareness) are a reasonable first hypothesis
-  alongside supply-side coverage gaps.
+  full immunisation is less common among poorer households (concentration
+  index {conc['indicators'][1]['concentration_index']:+.2f}, concentrated
+  among the wealthy), demand-side barriers (cost, distance, awareness) are
+  a reasonable first hypothesis alongside supply-side coverage gaps.
 - Target counties flagged in the v2 vulnerability ranking where
   immunisation is one of the contributing indicators.
 

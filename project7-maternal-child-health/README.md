@@ -267,9 +267,10 @@ Problem Statement page. Summary:
   decisions, not just the point estimate.
 - **Skilled birth attendance is the sharpest wealth-equity gap** found
   (concentration index +0.66, 95% CI 0.62–0.70) — heavily concentrated
-  among wealthier households. Stunting (−0.25) and incomplete immunisation
-  (−0.16) both concentrate among poorer households, in the same direction
-  as each other but a smaller gap than SBA's. See
+  among wealthier households. Full immunisation (+0.16) concentrates among
+  wealthier households too, in the same direction but a much smaller gap
+  than SBA's; stunting (−0.25) is the one indicator that runs the other
+  way, concentrated among poorer households. See
   [`data/processed/task2_wealth_concentration_indices.json`](data/processed/task2_wealth_concentration_indices.json)
   for full provenance.
 - An independent county-level analysis (12–35 month age band) ranks

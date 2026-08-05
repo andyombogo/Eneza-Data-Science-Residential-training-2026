@@ -25,6 +25,8 @@ REGIONAL_SUMMARY = DATA_PROCESSED / "task2_stunting_summary.json"
 IMMUNISATION_SUMMARY = DATA_PROCESSED / "task2_immunisation_summary.json"
 SBA_SUMMARY = DATA_PROCESSED / "task2_sba_summary.json"
 COUNTY_STUNTING = DATA_PROCESSED / "task2_stunting_by_county.csv"
+COUNTY_IMMUNISATION = DATA_PROCESSED / "task2_immunisation_by_county.csv"
+COUNTY_SBA = DATA_PROCESSED / "task2_sba_by_county.csv"
 WEALTH_QUINTILE = DATA_PROCESSED / "task2_wealth_quintile.csv"
 WEALTH_CONCENTRATION = DATA_PROCESSED / "task2_wealth_concentration_indices.json"
 PRIORITY_COUNTIES = DATA_PROCESSED / "task4_priority_counties.csv"
@@ -141,6 +143,28 @@ def get_county_stunting() -> pd.DataFrame:
             f"column(s): {', '.join(sorted(missing))}."
         )
     return df.sort_values("prevalence_pct", ascending=False)
+
+
+def _read_county_csv(path: Path) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(path)
+    except FileNotFoundError:
+        _fail(f"Missing `{path.relative_to(PROJECT_ROOT)}`.")
+    expected = {"county", "prevalence_pct", "ci_lower", "ci_upper"}
+    missing = expected.difference(df.columns)
+    if missing:
+        _fail(f"`{path.relative_to(PROJECT_ROOT)}` is missing expected column(s): {', '.join(sorted(missing))}.")
+    return df.sort_values("prevalence_pct", ascending=False)
+
+
+@st.cache_data(show_spinner=False)
+def get_county_immunisation() -> pd.DataFrame:
+    return _read_county_csv(COUNTY_IMMUNISATION)
+
+
+@st.cache_data(show_spinner=False)
+def get_county_sba() -> pd.DataFrame:
+    return _read_county_csv(COUNTY_SBA)
 
 
 def has_wealth_quintile_data() -> bool:
@@ -261,6 +285,16 @@ def data_inventory() -> list[DataFile]:
             "Wealth-category (Low/Middle/High) indicator comparison", FIG_WEALTH_CATEGORY_INDICATORS, "Task 2",
             "preliminary" if FIG_WEALTH_CATEGORY_INDICATORS.exists() else "missing",
             "3-category wealth breakdown for all three indicators, recovered image.",
+        ),
+        DataFile(
+            "County immunisation (47 counties, 12–35mo)", COUNTY_IMMUNISATION, "Task 2",
+            "preliminary" if COUNTY_IMMUNISATION.exists() else "missing",
+            "Extracted from the forest-plot image pixels, not a rendered R output — see docs/data_dictionary.md.",
+        ),
+        DataFile(
+            "County SBA (47 counties, 12–35mo)", COUNTY_SBA, "Task 2",
+            "preliminary" if COUNTY_SBA.exists() else "missing",
+            "Extracted from the forest-plot image pixels, not a rendered R output — see docs/data_dictionary.md.",
         ),
         DataFile(
             "Priority counties (Task 4 v1, stunting only)", PRIORITY_COUNTIES, "Task 4",

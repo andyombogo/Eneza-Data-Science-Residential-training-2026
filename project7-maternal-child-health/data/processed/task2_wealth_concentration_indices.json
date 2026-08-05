@@ -20,11 +20,12 @@
       "interpretation": "Stunting is concentrated among poorer children -- a poorer child is meaningfully more likely to be stunted than a wealthier one."
     },
     {
-      "indicator": "non_full_immunisation",
-      "concentration_index": -0.16,
-      "ci_lower": -0.19,
-      "ci_upper": -0.12,
-      "interpretation": "Incomplete vaccination is concentrated among poorer children -- a smaller gap than stunting's, but the same direction."
+      "indicator": "full_immunisation",
+      "concentration_index": 0.16,
+      "ci_lower": 0.12,
+      "ci_upper": 0.19,
+      "interpretation": "Full immunisation is concentrated among wealthier children -- a poorer child is meaningfully less likely to be fully vaccinated. A smaller gap than stunting's, but the same direction of inequality.",
+      "sign_flip_note": "Recovered source reported this as non_full_immunisation (CI -0.16, 95% CI -0.19 to -0.12). Restated here in the positive-coverage direction (full_immunisation) by negating the index and swapping/negating the CI bounds -- exact for a binary indicator only when its prevalence is close to 50% (full immunisation = 50.3% nationally here), which holds to the precision reported (2 d.p.)."
     },
     {
       "indicator": "skilled_birth_attendance",

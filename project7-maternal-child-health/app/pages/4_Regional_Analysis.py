@@ -13,7 +13,6 @@ from utils import (
     COUNTY_MAP,
     COUNTY_STUNTING,
     FIG_HAZ_VIOLIN,
-    FIG_TOP_COUNTIES_RANKING,
     FIG_WEALTH_CATEGORY_INDICATORS,
     HAZ_HISTOGRAM,
     NATIONAL_STUNTING_PCT_6_59_LEGACY,
@@ -200,15 +199,5 @@ with st.expander("County table with 95% confidence intervals"):
             file_name="task2_stunting_by_county.csv",
             mime="text/csv",
         )
-
-if FIG_TOP_COUNTIES_RANKING.exists():
-    st.divider()
-    st.subheader("Multi-indicator vulnerability ranking")
-    st.image(
-        str(FIG_TOP_COUNTIES_RANKING),
-        caption="Top 10 counties by vulnerability index — equal-weight across stunting, non-immunisation, and non-SBA, counting how many of the three land each county in its worst-performing tertile.",
-        use_container_width=True,
-    )
-    st.caption("Full ranked list and methodology: Intervention Prioritization page.")
 
 page_footer("Regional Analysis")

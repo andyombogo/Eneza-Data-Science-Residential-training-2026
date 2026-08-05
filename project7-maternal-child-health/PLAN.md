@@ -59,6 +59,13 @@ their annotated statistics):
 | Non-full immunisation | −0.16 (−0.19, −0.12) | Concentrated among the poor (smaller gap) |
 | Skilled birth attendance | **+0.66 (0.62, 0.70)** | Heavily concentrated among the wealthy — the largest gap of the three |
 
+**Restated 2026-08-05** as `full_immunisation`, +0.16 (0.12, 0.19), in the
+app and the JSON below — the positive-coverage framing, consistent with
+how the other two indicators are already stated (full stunting risk,
+skilled birth attendance itself, not their inverses). Same underlying
+finding, sign flipped: full immunisation is concentrated among the
+wealthy, i.e. a poorer child is less likely to be fully immunised.
+
 These are now in `data/processed/task2_wealth_concentration_indices.json`
 (full provenance in the file) and surfaced on the Wealth Analysis app page,
 clearly labeled as recovered/not-yet-reproduced rather than presented as

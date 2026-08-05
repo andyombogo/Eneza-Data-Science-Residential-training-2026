@@ -19,6 +19,8 @@ from utils import (
     FIG_TOP_COUNTIES_RANKING,
     NATIONAL_STUNTING_PCT_6_59_LEGACY,
     PRIORITY_COUNTIES,
+    get_county_immunisation,
+    get_county_sba,
     get_file_bytes,
     get_immunisation_summary,
     get_priority_counties,
@@ -27,6 +29,56 @@ from utils import (
     get_wealth_note,
     page_footer,
 )
+
+
+def county_ranking_chart(df, national_pct, indicator_label, worse_direction, key):
+    """Same visual design as the v1 stunting ranking chart: horizontal bar,
+    sorted ascending, colored by a national +/- 1 SD threshold flag, with
+    dashed (national) and dotted (threshold) reference lines.
+
+    worse_direction: "high" (flag counties >= national + 1 SD, e.g. stunting)
+                      or "low" (flag counties <= national - 1 SD, e.g. coverage indicators).
+    """
+    sd = df["prevalence_pct"].std(ddof=1)
+    if worse_direction == "high":
+        threshold = round(national_pct + sd, 1)
+        is_flagged = df["prevalence_pct"] >= threshold
+    else:
+        threshold = round(national_pct - sd, 1)
+        is_flagged = df["prevalence_pct"] <= threshold
+
+    chart_df = df.sort_values("prevalence_pct").copy()
+    chart_df["Flag status"] = is_flagged.reindex(chart_df.index).map({True: "Flagged", False: "Not flagged"})
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Counties flagged", f"{int(is_flagged.sum())} of {len(df)}")
+    m2.metric("Threshold", f"{threshold:.1f}%", help=f"National ({national_pct:.1f}%) {'+' if worse_direction == 'high' else '-'} 1 SD across counties.")
+    worst = chart_df.iloc[-1] if worse_direction == "high" else chart_df.iloc[0]
+    m3.metric("Most concerning county", worst["county"], f"{worst['prevalence_pct']:.1f}%")
+
+    fig = px.bar(
+        chart_df,
+        x="prevalence_pct",
+        y="county",
+        orientation="h",
+        color="Flag status",
+        color_discrete_map={"Flagged": "#B84C4C", "Not flagged": "#3B6FA0"},
+        labels={"prevalence_pct": f"{indicator_label} (%)", "county": "County"},
+        height=900,
+    )
+    fig.add_vline(x=national_pct, line_dash="dash", line_color="black", annotation_text="National")
+    fig.add_vline(x=threshold, line_dash="dot", line_color="#B84C4C", annotation_text="Threshold")
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor="white", legend_title=None)
+    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.caption(
+        f"Dashed line: national prevalence ({national_pct:.1f}%). Dotted "
+        f"line: national {'+' if worse_direction == 'high' else '-'} 1 SD "
+        f"across counties ({threshold:.1f}%), the same rule used for the v1 "
+        "stunting ranking above, applied here for visual consistency — not "
+        "a team-adopted threshold for this indicator. County-level values "
+        "are extracted from the forest-plot image (see `docs/data_dictionary.md`), "
+        "not a rendered R output — treat as approximate."
+    )
 
 st.set_page_config(page_title="Intervention Prioritization — Project 7", page_icon="🎯", layout="wide")
 
@@ -117,6 +169,33 @@ st.info(
     "strong cases for intervention if one estimate is far less certain.",
     icon="📏",
 )
+
+st.divider()
+st.header("Immunisation and SBA — county rankings")
+st.markdown(
+    "Same 47-county ranking view as the v1 stunting chart above, for the "
+    "other two indicators (12–35 month band)."
+)
+
+tab_immun, tab_sba = st.tabs(["Full immunisation", "Skilled birth attendance"])
+with tab_immun:
+    county_immun = get_county_immunisation()
+    county_ranking_chart(
+        county_immun,
+        immun_summary["national"]["full_immunisation_prevalence_weighted_pct"],
+        "Full immunisation",
+        worse_direction="low",
+        key="immun_ranking",
+    )
+with tab_sba:
+    county_sba = get_county_sba()
+    county_ranking_chart(
+        county_sba,
+        sba_summary["national"]["sba_prevalence_weighted_pct"],
+        "Skilled birth attendance",
+        worse_direction="low",
+        key="sba_ranking",
+    )
 
 st.divider()
 st.header("v2 — multi-indicator vulnerability ranking")
