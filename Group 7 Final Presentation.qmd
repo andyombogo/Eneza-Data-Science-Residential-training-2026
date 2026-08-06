@@ -1,0 +1,307 @@
+---
+title: "Maternal and child health variation by wealth status and region in Kenya: A geostatistical analysis"
+author:
+  - 'Elphas Abok`\inst{1}`{=latex}'
+  - 'Jared Onsomu`\inst{2}`{=latex}'
+  - 'John Andrew`\inst{3}`{=latex}'
+  - 'Kevinson Mwangi`\inst{4}`{=latex}'
+institute:
+  - '`\inst{1}`{=latex} ICIPE'
+  - '`\inst{2}`{=latex} USIU'
+  - '`\inst{3}`{=latex} Brain and Mind Institute, AKU'
+  - '`\inst{4}`{=latex} Institute for Human Development, AKU'
+fontsize: 11pt
+format:
+  beamer:
+    theme: Madrid
+    colortheme: spruce
+    fonttheme: structurebold
+header-includes:
+  - \setbeamertemplate{footline}[frame number]
+  - \setbeamerfont{date}{size=\small}
+  - \setbeamersize{text margin left=0.3cm,text margin right=0.3cm}
+  - \usepackage{float}
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  dpi = 500,
+  fig.width = 8,
+  fig.height = 6
+)
+
+```
+
+------------------------------------------------------------------------
+
+# Background
+
+-   Maternal and child health (MCH) remains a global public health priority
+
+\vspace{0.5cm}
+
+-   Geographic inequalities in **stunting**, **vaccination**, and **skilled birth attendance** persist despite substantial progress
+
+
+\vspace{0.5cm}
+
+
+-   Identifying geographic disparities and their determinants is essential for informing equitable resource allocation and targeted interventions
+
+------------------------------------------------------------------------
+
+# Study indicators within the SDG framework
+
+-   **Stunting (SDG 2.2.1)** 
+
+    -   End all forms of malnutrition by 2030
+    
+    -   Reflects chronic undernutrition with lasting effects on physical growth and cognitive development
+    
+
+. . .
+    
+    
+-   **Vaccination (SDG 3.b.1)**
+
+    -   Supports universal health coverage through equitable access to essential vaccines
+    
+    -   Protects children against vaccine-preventable diseases and strengthens population immunity
+    
+    
+. . .
+
+    
+-   **Skilled birth attendance (SDG 3.1.2)**
+
+    -   Contributes to reducing maternal mortality
+    
+    -   Prevents intrapartum complications through skilled obstetric care
+
+
+
+------------------------------------------------------------------------
+
+# Research questions
+
+1.    How do stunting, vaccination, and skilled birth attendance vary across wealth quintiles and regions in Kenya?
+
+
+\vspace{0.5cm}
+
+
+2.    Which populations and geographic areas should be prioritised for intervention?
+
+
+------------------------------------------------------------------------
+
+# Methods
+
+**Data**
+
+-   Kenya Demographic and Health Survey (KDHS) 2022 – Children's (KR) dataset
+
+. . .
+
+
+**Population**
+
+-   Youngest living child aged 12-35 months (weighted n = 5478)
+
+. . .
+
+
+**Analyses**
+
+*Individual level analyses*
+
+-   Survey-weighted national and regional prevalence (95% CI)
+
+-   Wealth-related inequalities:
+
+    -   Concentration curves and concentration indices
+    
+    -   Multivariable logistic regression (adjusted odds ratios)
+
+. . .
+
+*Cluster level analyses*
+
+-   Model-based geostatistics (Bayesian spatial modelling)
+
+-   Prediction of indicator prevalence in unsampled locations
+
+
+------------------------------------------------------------------------
+
+# Variable definations
+
+**Stunting**
+
+-   Height for age z-score 2 SD below the WHO reference population median
+
+. . .
+
+
+**Skilled birth attendance (SBA)**
+
+-   Delivery assisted by a skilled health professional (doctor, nurse, midwife, or clinical officer)
+
+
+. . .
+
+
+**Vaccination**
+
+Children aged 12–35 months who received all age-appropriate vaccines:
+
+-   BCG
+-   Polio (birth dose, OPV/IPV)
+-   DPT-HepB-Hib (3 doses)
+-   PCV (3 doses)
+-   Rotavirus (2 doses)
+-   Measles–Rubella (MR1 for 12–23; MR1 + MR2 for 24–35 months)
+    
+------------------------------------------------------------------------
+
+# 
+
+\begin{center}
+  {\textbf{Individual level analyses}}
+\end{center}
+
+------------------------------------------------------------------------
+
+# Inequality in the distribution of indicators by wealth status
+
+\begin{center}
+\includegraphics[width=0.70\textwidth]{./Plots/combined_cc_graphs.png}
+\end{center}
+
+
+------------------------------------------------------------------------
+
+\vspace{-1.0cm} 
+
+\begin{center}
+\includegraphics[width=0.99\textwidth]{./Plots/combined_maps.png}
+\end{center}
+
+
+------------------------------------------------------------------------
+
+# 
+
+
+\begin{center}
+  {\textbf{Cluster level analyses}}
+\end{center}
+
+
+------------------------------------------------------------------------
+
+# Model based geostatistics specification
+
+**Likelihood:**
+$$y_i \mid p_i \sim \text{Binomial}(n_i, p_i), \quad i = 1, \dots, N$$
+
+**Linear predictor:**
+$$\text{logit}(p_i) = \beta_0 + \mathbf{X}_i^\top \boldsymbol{\beta} + Z(s_i) + \epsilon_i$$
+
+\vspace{0.3cm}
+
+::: {.block title="Where"}
+\small
+- $y_i$, $n_i$: number of cases and individuals sampled at cluster $i$
+- $\mathbf{X}_i^\top \boldsymbol{\beta}$: fixed effects (covariates)
+- $Z(s_i)$: spatial random effect 
+- $\epsilon_i$: unstructured random noise (nugget)
+
+\vspace{0.1cm}
+
+- Covariates included child age, child gender; parity, mother age, education, marital status, employment status; household wealth and area of residence
+:::
+
+------------------------------------------------------------------------
+
+# Model checks and evaluation
+
+-   Variograms for evidence of spatial autocorrelation
+
+\vspace{0.5cm}
+
+-   Multicollinearity among the covariates
+
+\vspace{0.5cm}
+
+-   Observed vs predicted probabilities
+
+
+
+------------------------------------------------------------------------
+
+
+\vspace{-1.0cm} 
+
+\begin{center}
+\includegraphics[width=0.99\textwidth]{./Plots/combined_cluster_observed_prev_graphs.png}
+\end{center}
+
+
+------------------------------------------------------------------------
+
+\vspace{-1.0cm} 
+
+\begin{center}
+\includegraphics[width=0.99\textwidth]{./Plots/combined_predicted_graphs.png}
+\end{center}
+
+
+
+------------------------------------------------------------------------
+
+# Recommendations
+
+1.    **Prioritize skilled birth attendance for the poorest** — steepest pro-rich gap of the three indicators (CI = 0.66; aOR 3.66 for wealthy vs. poor)
+
+\vspace{0.1cm}
+
+. . .
+
+2.    **Target stunting hotspots directly** — sharp geographic clustering (up to 40–49.9%) concentrated among poorer children (CI = -0.25)
+
+\vspace{0.1cm}
+
+. . .
+
+3.    **Close vaccination gaps in poor, remote counties** — also pro-rich (CI = 0.16), with <20% coverage concentrated in arid northern counties
+
+\vspace{0.1cm}
+
+. . .
+
+4.    **Allocate health resources by county, not nationally** — each indicator has different worst-performing counties, so no single blanket program fits all
+
+\vspace{0.1cm}
+
+. . .
+
+
+5.    **Adopt small-area estimation for ongoing monitoring** — fine-resolution maps catch hotspots that county-level aggregates miss
+
+------------------------------------------------------------------------
+
+# Acknowledgements
+
+\begin{center}
+\includegraphics[height=1.5cm]{./Acknowledgments/nih.jpg}
+\hspace{1.5cm}
+\includegraphics[height=1.5cm]{./Acknowledgments/dsi.png}
+\hspace{1.5cm}
+\includegraphics[height=1.5cm]{./Acknowledgments/icipe.png}
+\end{center}
