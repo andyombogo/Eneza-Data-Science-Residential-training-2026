@@ -1,9 +1,9 @@
-"""Problem statement, objectives, and Task 2 / Task 4 deliverables status.
+"""Problem statement, objectives, and deliverables status.
 
 Content mirrors README.md (Problem statement / Why this matters / Objectives)
-and PLAN.md (Deliverables checklist) verbatim in substance -- this page is a
-presentation layer over those files, not a second source of truth. When
-PLAN.md's checklist changes, update DELIVERABLES below to match.
+verbatim in substance -- this page is a presentation layer over the README,
+not a second source of truth. When the README's deliverables list changes,
+update DELIVERABLES below to match.
 """
 
 import sys
@@ -65,12 +65,8 @@ st.markdown(
 st.divider()
 st.success("**Status: Complete.** All Task 2 and Task 4 deliverables below are done.", icon="✅")
 st.header("Deliverables")
-st.caption(
-    "Mirrors `PLAN.md` § Deliverables checklist — that file is the source "
-    "of truth; this is a presentation of the same list."
-)
 
-# (label, done) -- keep in sync with PLAN.md's checklist.
+# (label, done) -- keep in sync with README.md's Deliverables section.
 TASK2_DELIVERABLES = [
     ("National stunting, immunisation, and SBA prevalence — 12–35 months", True),
     ("County-level stunting, immunisation, and SBA — forest plots & choropleth maps", True),
@@ -124,9 +120,6 @@ st.markdown(
     "uses the current 12–35 month figures."
 )
 
-st.caption(
-    "Full requirement-by-requirement gap analysis: `docs/task2_audit_report.md`. "
-    "See the Data page for a live completeness check."
-)
+st.caption("See the Data page for a live completeness check on every committed output file.")
 
 page_footer("Problem Statement")

@@ -136,10 +136,9 @@ with tab_map:
             icon="⏳",
         )
     st.caption(
-        "An interactive county *choropleth* (as opposed to this static image) needs "
-        "county boundary geometry in GeoJSON form — not available in this repo yet "
-        "(the R map above is built from `rKenyaCensus`, an R-only `.rda` object). "
-        "See `docs/task2_audit_report.md` § 4 for what's needed."
+        "The map above is a static image built in R from `rKenyaCensus` "
+        "county boundaries. See the Interactive chart tab for a hoverable, "
+        "sortable view of the same county-level estimates."
     )
 with tab_interactive:
     county_sorted = county.sort_values("prevalence_pct")

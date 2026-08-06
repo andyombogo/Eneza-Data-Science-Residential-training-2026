@@ -1,9 +1,9 @@
-"""Task 2 (wealth axis): indicators by household wealth.
+"""Wealth axis: indicators by household wealth.
 
 Two complementary views:
 1. Concentration indices -- data/processed/task2_wealth_concentration_indices.json.
-2. A discrete 5-quintile breakdown (data/processed/task2_wealth_quintile.csv),
-   which scripts/wealth_quintile_analysis.R produces.
+2. A 3-category (Low/Middle/High) wealth breakdown for all three indicators,
+   on the Regional Analysis page.
 """
 
 import sys
@@ -99,57 +99,54 @@ if has_wealth_concentration_data():
             file_name="task2_wealth_concentration_indices.json",
             mime="application/json",
         )
-    st.divider()
 else:
     st.warning("Concentration-index findings not found.", icon="⏳")
 
-st.subheader("Full wealth-quintile breakdown")
-
-if not has_wealth_quintile_data():
-    st.info(
-        "A discrete 5-quintile table isn't available; the concentration "
-        "indices above already answer \"does this vary by wealth,\" and a "
-        "3-category (Low/Middle/High) breakdown for all three indicators is "
-        "on the Regional Analysis page.",
-        icon="ℹ️",
-    )
-    st.stop()
-
-wealth = get_wealth_quintile()
-order = ["Poorest", "Poorer", "Middle", "Richer", "Richest"]
-wealth["wealth_quintile"] = wealth["wealth_quintile"].astype(
-    pd.CategoricalDtype(categories=order, ordered=True)
+st.divider()
+st.subheader("Wealth-category breakdown")
+st.markdown(
+    "A complementary discrete view — Low/Middle/High wealth-category "
+    "prevalence for all three indicators — is on the Regional Analysis "
+    "page, alongside the county-level maps."
 )
 
-for indicator in sorted(wealth["indicator"].unique()):
-    st.markdown(f"**{indicator.replace('_', ' ').title()}**")
-    subset = wealth[wealth["indicator"] == indicator].sort_values("wealth_quintile")
-    st.bar_chart(subset.set_index("wealth_quintile")[["prevalence_pct"]])
-    poorest = subset.iloc[0]
-    richest = subset.iloc[-1]
-    gap = poorest["prevalence_pct"] - richest["prevalence_pct"]
-    st.caption(
-        f"Poorest quintile: {poorest['prevalence_pct']:.1f}% · "
-        f"Richest quintile: {richest['prevalence_pct']:.1f}% · "
-        f"Gap: {gap:+.1f} points"
+if has_wealth_quintile_data():
+    wealth = get_wealth_quintile()
+    order = ["Poorest", "Poorer", "Middle", "Richer", "Richest"]
+    wealth["wealth_quintile"] = wealth["wealth_quintile"].astype(
+        pd.CategoricalDtype(categories=order, ordered=True)
     )
-    with st.expander("Table with 95% confidence intervals"):
-        st.dataframe(
-            subset.rename(columns={
-                "wealth_quintile": "Wealth quintile", "prevalence_pct": "Prevalence (%)",
-                "ci_lower": "CI lower", "ci_upper": "CI upper",
-            })[["Wealth quintile", "Prevalence (%)", "CI lower", "CI upper"]],
-            hide_index=True, width="stretch",
-        )
-    st.divider()
 
-quintile_bytes = get_file_bytes(WEALTH_QUINTILE)
-if quintile_bytes:
-    st.download_button(
-        "⬇️ Download wealth-quintile CSV",
-        data=quintile_bytes,
-        file_name="task2_wealth_quintile.csv",
-        mime="text/csv",
-    )
+    st.markdown("**Full 5-quintile breakdown**")
+    for indicator in sorted(wealth["indicator"].unique()):
+        st.markdown(f"**{indicator.replace('_', ' ').title()}**")
+        subset = wealth[wealth["indicator"] == indicator].sort_values("wealth_quintile")
+        st.bar_chart(subset.set_index("wealth_quintile")[["prevalence_pct"]])
+        poorest = subset.iloc[0]
+        richest = subset.iloc[-1]
+        gap = poorest["prevalence_pct"] - richest["prevalence_pct"]
+        st.caption(
+            f"Poorest quintile: {poorest['prevalence_pct']:.1f}% · "
+            f"Richest quintile: {richest['prevalence_pct']:.1f}% · "
+            f"Gap: {gap:+.1f} points"
+        )
+        with st.expander("Table with 95% confidence intervals"):
+            st.dataframe(
+                subset.rename(columns={
+                    "wealth_quintile": "Wealth quintile", "prevalence_pct": "Prevalence (%)",
+                    "ci_lower": "CI lower", "ci_upper": "CI upper",
+                })[["Wealth quintile", "Prevalence (%)", "CI lower", "CI upper"]],
+                hide_index=True, width="stretch",
+            )
+        st.divider()
+
+    quintile_bytes = get_file_bytes(WEALTH_QUINTILE)
+    if quintile_bytes:
+        st.download_button(
+            "⬇️ Download wealth-quintile CSV",
+            data=quintile_bytes,
+            file_name="task2_wealth_quintile.csv",
+            mime="text/csv",
+        )
 
 page_footer("Wealth Analysis")

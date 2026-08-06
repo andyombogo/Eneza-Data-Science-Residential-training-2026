@@ -22,6 +22,6 @@
     "county_forest_plot_png": "Plots/Stunting_forest_plot.png",
     "county_map_png": "Plots/Stunting_map.png",
     "county_rows": 47,
-    "note": "The previously committed data/processed/task2_stunting_by_county.csv is the earlier 6-59 month band and is kept for the v1 intervention ranking's internal consistency -- see PLAN.md. The current 12-35 month county-level view is the recovered forest plot / map images, not a re-derived CSV (no exact county-level 12-35mo table exists in this repo)."
+    "note": "data/processed/task2_stunting_by_county.csv is the earlier 6-59 month band, kept for the v1 intervention ranking's internal consistency. The current 12-35 month county-level view is the forest plot / map images, not a re-derived CSV (no exact county-level 12-35mo table exists in this repo)."
   }
 }

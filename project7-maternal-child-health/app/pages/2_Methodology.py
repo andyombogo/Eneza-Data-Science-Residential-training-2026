@@ -110,6 +110,6 @@ with tab_mbg:
         exists = path.exists()
         st.markdown(f"{'✅' if exists else '⬜'} **{label}** — `{path.name}`" + (f" ({len(path.read_text(encoding='utf-8').splitlines())} lines)" if exists else " — not found"))
 
-st.caption("Rendered diagnostics and predictions: Spatial & Bayesian Analysis page. Full gap analysis: `docs/task2_audit_report.md`.")
+st.caption("Rendered diagnostics and predictions: Spatial & Bayesian Analysis page.")
 
 page_footer("Methodology")

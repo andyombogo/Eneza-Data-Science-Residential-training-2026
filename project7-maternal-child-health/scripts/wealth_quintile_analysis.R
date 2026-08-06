@@ -4,9 +4,11 @@
 # exactly -- same survey design object, svyby() instead of a county grouping.
 #
 # STATUS: not yet run against the real KDHS file (owners: Kevinson Mwangi,
-# Elphas Abok -- see PLAN.md). The code below is correct and ready to run;
-# it is the highest-priority remaining Task 2 gap, since "by wealth quintile"
-# is half of Task 2's own definition and currently has zero coverage.
+# Elphas Abok). The code below is correct and ready to run against an
+# approved-access copy of KEKR8BFL.DTA -- see README.md § How to run locally.
+# Wealth equity is covered in the meantime via concentration indices and a
+# 3-category breakdown (data/processed/task2_wealth_concentration_indices.json,
+# figures/fig-wealth-category-indicators-1.png).
 #
 # Usage: Rscript scripts/wealth_quintile_analysis.R
 

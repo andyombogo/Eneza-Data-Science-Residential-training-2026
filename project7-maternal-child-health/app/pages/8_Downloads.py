@@ -51,8 +51,7 @@ for task in ["Task 2", "Task 4"]:
 
 st.caption(
     "Column-level schema for each file: "
-    "[`docs/data_dictionary.md`](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/task2-4-submission/project7-maternal-child-health/docs/data_dictionary.md). "
-    "Full audit: `docs/task2_audit_report.md`."
+    "[`docs/data_dictionary.md`](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/main/project7-maternal-child-health/docs/data_dictionary.md)."
 )
 
 page_footer("Downloads")

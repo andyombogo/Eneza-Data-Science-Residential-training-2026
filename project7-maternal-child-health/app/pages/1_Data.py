@@ -39,8 +39,8 @@ st.warning(
     "**Raw KDHS microdata is never committed to this repository, by design.** "
     "Every number on every page below is computed from that restricted file "
     "*outside* this repo and only the small, aggregate, non-identifying "
-    "output is committed to `data/processed/` — see `PLAN.md` § Repository "
-    "rules.",
+    "output is committed to `data/processed/` — see "
+    "`docs/ethics_data_protection.md`.",
     icon="🔒",
 )
 
@@ -90,7 +90,7 @@ st.divider()
 st.subheader("Full data dictionary")
 st.markdown(
     "Column-level schema for every file above: "
-    "[`docs/data_dictionary.md`](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/task2-4-submission/project7-maternal-child-health/docs/data_dictionary.md)."
+    "[`docs/data_dictionary.md`](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/main/project7-maternal-child-health/docs/data_dictionary.md)."
 )
 
 page_footer("Data")
