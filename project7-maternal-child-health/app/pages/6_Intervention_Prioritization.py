@@ -69,7 +69,7 @@ def county_ranking_chart(df, national_pct, indicator_label, worse_direction, key
     fig.add_vline(x=national_pct, line_dash="dash", line_color="black", annotation_text="National")
     fig.add_vline(x=threshold, line_dash="dot", line_color="#B84C4C", annotation_text="Threshold")
     fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor="white", legend_title=None)
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(fig, width="stretch", key=key)
     st.caption(
         f"Dashed line: national prevalence ({national_pct:.1f}%). Dotted "
         f"line: national {'+' if worse_direction == 'high' else '-'} 1 SD "
@@ -133,7 +133,7 @@ fig = px.bar(
 fig.add_vline(x=NATIONAL_STUNTING_PCT_6_59_LEGACY, line_dash="dash", line_color="black", annotation_text="National (6–59mo)")
 fig.add_vline(x=threshold, line_dash="dot", line_color="#B84C4C", annotation_text="Threshold")
 fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor="white", legend_title=None)
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 st.caption(
     f"Dashed line: national prevalence ({NATIONAL_STUNTING_PCT_6_59_LEGACY}%, "
     f"6–59mo band). Dotted line: priority threshold ({threshold:.1f}%). Bars "
@@ -150,7 +150,7 @@ st.dataframe(
         "ci_lower": "CI lower", "ci_upper": "CI upper",
         "gap_vs_national_pct": "vs. national (pts)", "ci_width_pct": "CI width (pts)",
     }),
-    hide_index=True, use_container_width=True,
+    hide_index=True, width="stretch",
 )
 
 priority_bytes = get_file_bytes(PRIORITY_COUNTIES)
@@ -211,7 +211,7 @@ if FIG_TOP_COUNTIES_RANKING.exists():
     st.image(
         str(FIG_TOP_COUNTIES_RANKING),
         caption="Top 10 counties by vulnerability index.",
-        use_container_width=True,
+        width="stretch",
     )
 
 st.markdown("**Summary table — all three indicators**")
@@ -229,7 +229,7 @@ V2_RANKING = [
 ]
 v2_df = pd.DataFrame(V2_RANKING, columns=["County", "# indicators in worst tertile", "Which indicators"])
 v2_df.insert(0, "Rank", range(1, len(v2_df) + 1))
-st.dataframe(v2_df, hide_index=True, use_container_width=True)
+st.dataframe(v2_df, hide_index=True, width="stretch")
 st.caption(
     "Top 10 shown, read directly from the ranking's own county/tertile-count "
     "labels — see the image above for the full vulnerability-index scale. "

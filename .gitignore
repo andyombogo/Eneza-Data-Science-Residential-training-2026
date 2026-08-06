@@ -1,0 +1,5 @@
+# Task 2 Quarto render artifacts belong outside Git.
+# Keep the source under project7-maternal-child-health/notebooks/ instead.
+/Project7_task2.qmd
+/Project7_task2.html
+/Project7_task2_files/

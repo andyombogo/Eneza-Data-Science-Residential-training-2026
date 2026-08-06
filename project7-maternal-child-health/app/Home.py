@@ -113,7 +113,7 @@ tasks = pd.DataFrame(
         },
     ]
 ).set_index("Task")
-st.dataframe(tasks, use_container_width=True)
+st.dataframe(tasks, width="stretch")
 
 st.divider()
 st.subheader("Data sources")

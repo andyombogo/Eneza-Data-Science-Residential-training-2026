@@ -45,7 +45,7 @@ if COMBINED_CLUSTER_OBSERVED_PREV.exists():
     st.image(
         str(COMBINED_CLUSTER_OBSERVED_PREV),
         caption="DHS cluster locations and observed prevalence, stunting / immunisation / SBA.",
-        use_container_width=True,
+        width="stretch",
     )
 else:
     st.info("Not available.", icon="⏳")
@@ -55,12 +55,12 @@ st.subheader("Preliminary checks")
 tab_corr, tab_vario = st.tabs(["Multicollinearity", "Variograms"])
 with tab_corr:
     if COMBINED_CORRELATION.exists():
-        st.image(str(COMBINED_CORRELATION), caption="Correlation between candidate covariates.", use_container_width=True)
+        st.image(str(COMBINED_CORRELATION), caption="Correlation between candidate covariates.", width="stretch")
     else:
         st.info("Not available.", icon="⏳")
 with tab_vario:
     if COMBINED_VARIOGRAMS.exists():
-        st.image(str(COMBINED_VARIOGRAMS), caption="Empirical variograms — residual spatial correlation by indicator.", use_container_width=True)
+        st.image(str(COMBINED_VARIOGRAMS), caption="Empirical variograms — residual spatial correlation by indicator.", width="stretch")
     else:
         st.info("Not available.", icon="⏳")
 
@@ -70,13 +70,14 @@ if COMBINED_PREDICTED.exists():
     st.image(
         str(COMBINED_PREDICTED),
         caption="Model-predicted prevalence surfaces, stunting / immunisation / SBA.",
-        use_container_width=True,
+        width="stretch",
     )
     st.markdown(
         "The predicted surface smooths prevalence across space using "
         "information from nearby clusters, rather than reporting one flat "
-        "estimate per county — visible here as continuous gradients instead "
-        "of hard county borders."
+        "estimate per county — visible here as continuous color gradients "
+        "that cut across county lines. County boundaries are overlaid for "
+        "geographic reference only, not as prediction breaks."
     )
 else:
     st.info("Not available.", icon="⏳")

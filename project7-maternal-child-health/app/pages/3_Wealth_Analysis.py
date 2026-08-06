@@ -42,7 +42,7 @@ if COMBINED_CC_GRAPHS.exists():
     st.image(
         str(COMBINED_CC_GRAPHS),
         caption="Inequality in the distribution of stunting, immunisation, and skilled birth attendance by wealth status.",
-        use_container_width=True,
+        width="stretch",
     )
 
 if has_wealth_concentration_data():
@@ -88,7 +88,7 @@ if has_wealth_concentration_data():
         margin=dict(l=10, r=10, t=10, b=10),
         plot_bgcolor="white",
     )
-    st.plotly_chart(forest, use_container_width=True)
+    st.plotly_chart(forest, width="stretch")
     st.caption("Dashed line at 0 = no wealth gradient. Whiskers are the 95% CI from `rineq::ci()`.")
 
     conc_bytes = get_file_bytes(WEALTH_CONCENTRATION)
@@ -139,7 +139,7 @@ for indicator in sorted(wealth["indicator"].unique()):
                 "wealth_quintile": "Wealth quintile", "prevalence_pct": "Prevalence (%)",
                 "ci_lower": "CI lower", "ci_upper": "CI upper",
             })[["Wealth quintile", "Prevalence (%)", "CI lower", "CI upper"]],
-            hide_index=True, use_container_width=True,
+            hide_index=True, width="stretch",
         )
     st.divider()
 

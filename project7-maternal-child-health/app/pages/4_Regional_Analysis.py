@@ -86,7 +86,7 @@ with col_hist:
         st.image(
             str(HAZ_HISTOGRAM),
             caption="Height-for-age z-scores. WHO stunting cutoff: HAZ < -2.",
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("Not yet generated — run `make regional`.", icon="⏳")
@@ -95,7 +95,7 @@ if FIG_HAZ_VIOLIN.exists():
     st.image(
         str(FIG_HAZ_VIOLIN),
         caption="HAZ distribution by wealth category and residence (12-35 months).",
-        use_container_width=True,
+        width="stretch",
     )
 
 with st.expander("Methodology"):
@@ -108,7 +108,7 @@ if FIG_WEALTH_CATEGORY_INDICATORS.exists():
     st.image(
         str(FIG_WEALTH_CATEGORY_INDICATORS),
         caption="Weighted prevalence of stunting, full immunisation, and skilled birth attendance across Low/Middle/High wealth categories.",
-        use_container_width=True,
+        width="stretch",
     )
     st.caption("A 3-category wealth breakdown for all three indicators — see Wealth Analysis for the continuous-wealth concentration-index view.")
 
@@ -128,7 +128,7 @@ tab_map, tab_interactive, tab_bar, tab_clustering = st.tabs(
 )
 with tab_map:
     if COUNTY_MAP.exists():
-        st.image(str(COUNTY_MAP), caption="Weighted stunting prevalence by county (6–59 month band).", use_container_width=True)
+        st.image(str(COUNTY_MAP), caption="Weighted stunting prevalence by county (6–59 month band).", width="stretch")
     else:
         st.info(
             "Map not yet generated — run `make regional` (`scripts/regional_analysis.R`), "
@@ -166,7 +166,7 @@ with tab_interactive:
         margin=dict(l=10, r=10, t=10, b=10),
         plot_bgcolor="white",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.caption(
         "Hover a bar for the exact prevalence and 95% CI. This chart and its "
         "national reference line use the 6–59 month county data (matching "
@@ -176,10 +176,10 @@ with tab_interactive:
         "deficiency."
     )
 with tab_bar:
-    st.bar_chart(county.set_index("county")[["prevalence_pct"]], horizontal=True, use_container_width=True)
+    st.bar_chart(county.set_index("county")[["prevalence_pct"]], horizontal=True, width="stretch")
 with tab_clustering:
     if COMBINED_MAPS.exists():
-        st.image(str(COMBINED_MAPS), caption="Regional clustering across stunting, immunisation, and SBA (12–35 months).", use_container_width=True)
+        st.image(str(COMBINED_MAPS), caption="Regional clustering across stunting, immunisation, and SBA (12–35 months).", width="stretch")
     else:
         st.info("Not available.", icon="⏳")
 
@@ -189,7 +189,7 @@ with st.expander("County table with 95% confidence intervals"):
             "county": "County", "prevalence_pct": "Prevalence (%)",
             "ci_lower": "CI lower", "ci_upper": "CI upper",
         }),
-        hide_index=True, use_container_width=True,
+        hide_index=True, width="stretch",
     )
     county_bytes = get_file_bytes(COUNTY_STUNTING)
     if county_bytes:
