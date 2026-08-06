@@ -18,7 +18,6 @@ from utils import (
     get_regional_summary,
     get_sba_summary,
     get_wealth_concentration,
-    has_wealth_quintile_data,
     page_footer,
 )
 
@@ -108,14 +107,12 @@ st.markdown(
 """
 )
 
-if not has_wealth_quintile_data():
-    st.info(
-        "**Wealth is analysed via concentration indices and a 3-category "
-        "(Low/Middle/High) breakdown**, not yet a discrete 5-quintile table — "
-        "both already establish the direction and rough size of each "
-        "indicator's wealth gap (see Wealth Analysis and Regional Analysis).",
-        icon="ℹ️",
-    )
+st.info(
+    "**Wealth is analysed via concentration indices and a 3-category "
+    "(Low/Middle/High) breakdown**, establishing the direction and size of "
+    "each indicator's wealth gap (see Wealth Analysis and Regional Analysis).",
+    icon="ℹ️",
+)
 
 st.divider()
 st.subheader("What this analysis does not claim")
