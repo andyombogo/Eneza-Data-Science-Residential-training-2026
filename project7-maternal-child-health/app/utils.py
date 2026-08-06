@@ -62,7 +62,6 @@ NATIONAL_STUNTING_PCT = 21.7
 # computed on the earlier 6-59 month county CSV and hasn't been re-run on the
 # 12-35 month band -- its own internal threshold math must stay tied to the
 # band it was actually computed on, not the current headline figure above.
-# See PLAN.md § Recovered analysis for the age-band discrepancy this reflects.
 NATIONAL_STUNTING_PCT_6_59_LEGACY = 17.4
 
 SDG_LINKS = {
@@ -206,8 +205,9 @@ def get_wealth_note() -> str:
     if WEALTH_NOTE.exists():
         return WEALTH_NOTE.read_text(encoding="utf-8").strip()
     return (
-        "Wealth-quintile data not yet available — county geography is "
-        "currently the only prioritization axis. See the Wealth Analysis page."
+        "Wealth equity is analysed separately via concentration indices and "
+        "a 3-category (Low/Middle/High) breakdown — see the Wealth Analysis "
+        "page. County geography is the axis this ranking prioritizes on."
     )
 
 

@@ -44,8 +44,8 @@ st.divider()
 st.subheader("Links")
 st.markdown(
     "- [Repository](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026)\n"
-    "- [Project brief (`Project_7.md`)](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/task2-4-submission/Project_7.md)\n"
-    "- [Full audit report](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/task2-4-submission/project7-maternal-child-health/docs/task2_audit_report.md)"
+    "- [Project brief (`Project_7.md`)](https://github.com/andyombogo/Eneza-Data-Science-Residential-training-2026/blob/main/Project_7.md)\n"
+    "- [Live application](https://maternalandchildhealthoutcomes.streamlit.app) — this app, deployed"
 )
 
 st.divider()

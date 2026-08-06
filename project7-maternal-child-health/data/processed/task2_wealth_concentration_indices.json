@@ -1,6 +1,6 @@
 {
   "status": "recovered_not_yet_reproduced",
-  "description": "Erreygers/Wagstaff-style concentration indices (rineq::ci(), type='CIw') quantifying how each indicator is distributed across the DHS continuous wealth score (v191). Negative = outcome concentrated among the poor; positive = concentrated among the wealthy. This is a different, complementary method to a discrete 5-quintile breakdown (task2_wealth_quintile.csv) -- it answers the same 'does this vary by wealth' question using the full wealth continuum rather than 5 bins.",
+  "description": "Erreygers/Wagstaff-style concentration indices (rineq::ci(), type='CIw') quantifying how each indicator is distributed across the DHS continuous wealth score (v191). Negative = outcome concentrated among the poor; positive = concentrated among the wealthy. Complementary to the 3-category (Low/Middle/High) wealth breakdown surfaced on the Regional Analysis page -- it answers the same 'does this vary by wealth' question using the full wealth continuum rather than discrete bins.",
   "provenance": {
     "source_repo": "andyombogo/Eneza-Data-Science-Residential-training-2026",
     "source_branch": "task2-regional-indicators",
@@ -8,8 +8,8 @@
     "source_file": "Project7_task2.pdf",
     "rendered_date": "2026-07-31",
     "extracted_by": "reading the rendered PDF's concentration-curve figures directly (Figures 4, 7, 10) -- the underlying .qmd's inline prose stats did not evaluate due to a missing `r` engine prefix, but the code-chunk-generated plots, including their annotated values, rendered correctly",
-    "note": "The source commit's git tree is not reachable via a normal `git checkout` of task2-regional-indicators -- the file exists as a git blob but the branch tip's recorded tree does not include it (likely a broken commit from a GUI tool). Recovered via `git cat-file -p <blob-sha>`. See PLAN.md for the exact blob hashes and recovery command.",
-    "sample_note": "Computed on a 12-35 month age band (harmonized across all three indicators), not the 6-59 month band used for this repo's committed national/county stunting figures (17.4%) -- see PLAN.md for the resulting methodological discrepancy that needs team reconciliation before this is treated as final."
+    "note": "The source commit's git tree is not reachable via a normal `git checkout` of task2-regional-indicators -- the file exists as a git blob but the branch tip's recorded tree does not include it (likely a broken commit from a GUI tool). Recovered via `git cat-file -p <blob-sha>`.",
+    "sample_note": "Computed on a 12-35 month age band (harmonized across all three indicators), matching the team's app-wide standardization (see docs/methodology.md); the repo's legacy 6-59 month county stunting CSV is kept separately for the v1 intervention ranking's internal consistency (NATIONAL_STUNTING_PCT_6_59_LEGACY in app/utils.py)."
   },
   "indicators": [
     {

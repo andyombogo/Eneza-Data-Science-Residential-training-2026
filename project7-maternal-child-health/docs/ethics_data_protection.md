@@ -50,5 +50,4 @@ ranking is used carelessly:
 
 ## Roles
 
-See `README.md` § Team for current task ownership and `PLAN.md` for the
-group's branch/review workflow.
+See `README.md` § Team for current task ownership.
